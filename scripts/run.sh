@@ -1,6 +1,5 @@
 BUILD_DIR=~/.panda/build
 WORKSPACE_DIR=$(pwd)
-echo $WORKSPACE_DIR
 docker run \
   -e USER="$(id -u)" \
   -u="$(id -u)" \
