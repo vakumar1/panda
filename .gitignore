@@ -3,3 +3,4 @@ bazel-out
 bazel-panda
 bazel-testlogs
 MODULE.bazel.lock
+.vscode
