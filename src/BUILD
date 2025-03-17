@@ -2,9 +2,8 @@ cc_binary(
     name = "panda",
     srcs = [
         "main.cpp",
-        "model/table.cpp",
         "model/table.h",
-        "model/attrs.h",
+        "model/row.h",
     ],
     deps = [
         "@abseil-cpp//absl/strings",
