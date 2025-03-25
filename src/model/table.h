@@ -1,4 +1,3 @@
-
 #include <variant>
 #include <tuple>
 #include <vector>
@@ -14,20 +13,20 @@
 // model
 template<typename... GlobalSchema>
 struct Table {
-    std::unordered_set<HashableRow<GlobalSchema...>>& data;
+    std::unordered_set<HashableRow<GlobalSchema...>> data;
     attr_type<GlobalSchema...> attributes;
 };
 
 template<typename... GlobalSchema>
 struct Dictionary {
-    std::unordered_map<HashableRow<GlobalSchema...>, std::unordered_set<HashableRow<GlobalSchema...>>>& construction_map;
+    std::unordered_map<HashableRow<GlobalSchema...>, std::unordered_set<HashableRow<GlobalSchema...>>> construction_map;
     attr_type<GlobalSchema...> attributes_X;
     attr_type<GlobalSchema...> attributes_Y;
 };
 
 template<typename... GlobalSchema>
 struct ExtendedDictionary {
-    std::unordered_map<HashableRow<GlobalSchema...>, std::unordered_set<HashableRow<GlobalSchema...>>>& construction_map;
+    std::unordered_map<HashableRow<GlobalSchema...>, std::unordered_set<HashableRow<GlobalSchema...>>> construction_map;
     attr_type<GlobalSchema...> attributes_X;
     attr_type<GlobalSchema...> attributes_Y;
     attr_type<GlobalSchema...> attributes_Z;
@@ -36,47 +35,51 @@ struct ExtendedDictionary {
 // projection
 template<typename... GlobalSchema>
 Table<GlobalSchema...> project(
-        Table<GlobalSchema...>& table,
-        attr_type<GlobalSchema...> proj_attrs) {
-    std::unordered_set<HashableRow<GlobalSchema...>> proj_data = {};
+        const Table<GlobalSchema...>& table,
+        const attr_type<GlobalSchema...>& proj_attrs) {
+    Table<GlobalSchema...> proj_table;
+    proj_table.attributes = proj_attrs;
+    proj_table.data = {};
     for (const HashableRow<GlobalSchema...>& row : table.data) {
         HashableRow<GlobalSchema...> proj_row = mask_row<GlobalSchema...>(proj_attrs, row);
-        proj_data.insert(proj_row);
+        proj_table.data.insert(proj_row);
     }
-    return Table<GlobalSchema...>{proj_data, proj_attrs};
+    return proj_table;
 }
 
 // join
 template<typename... GlobalSchema>
 Table<GlobalSchema...> join(
-        Table<GlobalSchema...>& table,
-        Dictionary<GlobalSchema...>& dictionary) {
+        const Table<GlobalSchema...>& table,
+        const Dictionary<GlobalSchema...>& dictionary) {
 
     // TODO: add runtime precondition that overlap_attrs == 0
-    attr_type<GlobalSchema...> join_attrs = dictionary.attributes_X ^ dictionary.attributes_Y;
-    attr_type<GlobalSchema...> overlap_attrs = dictionary.attributes_X | dictionary.attributes_Y;
+    const attr_type<GlobalSchema...> join_attrs = dictionary.attributes_X ^ dictionary.attributes_Y;
+    const attr_type<GlobalSchema...> overlap_attrs = dictionary.attributes_X | dictionary.attributes_Y;
 
-    std::unordered_set<HashableRow<GlobalSchema...>> join_data = {};
+    Table<GlobalSchema...> join_table;
+    join_table.attributes = join_attrs;
+    join_table.data = {};
     for (const HashableRow<GlobalSchema...>& row_X : table.data) {
         if (dictionary.construction_map.count(row_X) > 0) {
-            for (const HashableRow<GlobalSchema...>& row_Y : dictionary.construction_map[row_X]) {
+            for (const HashableRow<GlobalSchema...>& row_Y : dictionary.construction_map.at(row_X)) {
                 HashableRow<GlobalSchema...> join_row = 
                     join_rows<GlobalSchema...>(row_X, row_Y, dictionary.attributes_X, dictionary.attributes_Y);
-                join_data.insert(join_row);
+                join_table.data.insert(join_row);
             }
         }
     }
-    return Table<GlobalSchema...>{join_data, join_attrs};
+    return join_table;
 }
 
 // extension
 template<typename... GlobalSchema>
 ExtendedDictionary<GlobalSchema...> extension(
-        Dictionary<GlobalSchema...>& dictionary,
-        attr_type<GlobalSchema...> ext_attrs) {
+        const Dictionary<GlobalSchema...>& dictionary,
+        const attr_type<GlobalSchema...>& ext_attrs) {
 
     // TODO: add runtime precondition that overlap_attrs == 0
-    attr_type<GlobalSchema...> overlap_attrs = ext_attrs | (dictionary.attributes_X | dictionary.attributes_Y);
+    const attr_type<GlobalSchema...> overlap_attrs = ext_attrs | (dictionary.attributes_X | dictionary.attributes_Y);
 
     return ExtendedDictionary<GlobalSchema...>{
         dictionary.construction_map,
@@ -89,37 +92,53 @@ ExtendedDictionary<GlobalSchema...> extension(
 // construction
 template<typename... GlobalSchema>
 Dictionary<GlobalSchema...> construction(
-        Table<GlobalSchema...>& table,
-        attr_type<GlobalSchema...> attrs_X,
-        attr_type<GlobalSchema...> attrs_Y) {
+        const Table<GlobalSchema...>& table,
+        const attr_type<GlobalSchema...>& attrs_X,
+        const attr_type<GlobalSchema...>& attrs_Y) {
 
     // TODO: add runtime precondition that overlap_attrs == 0
-    attr_type<GlobalSchema...> overlap_attrs = attrs_X | attrs_Y;
+    const attr_type<GlobalSchema...> overlap_attrs = attrs_X | attrs_Y;
 
     // TODO: add runtime precondition that join_attrs = table attrs
-    attr_type<GlobalSchema...> join_attrs = attrs_X ^ attrs_Y;
+    const attr_type<GlobalSchema...> join_attrs = attrs_X ^ attrs_Y;
 
-    std::unordered_map<HashableRow<GlobalSchema...>, std::unordered_set<HashableRow<GlobalSchema...>>> construction_map = {};
+    Dictionary<GlobalSchema...> dict;
+    dict.attributes_X = attrs_X;
+    dict.attributes_Y = attrs_Y;
+    dict.construction_map = {};
     for (const HashableRow<GlobalSchema...>& row : table.data) {
         HashableRow<GlobalSchema...> row_X = mask_row<GlobalSchema...>(attrs_X, row);
         HashableRow<GlobalSchema...> row_Y = mask_row<GlobalSchema...>(attrs_Y, row);
-        if (construction_map.count(row_X) == 0) {
-            construction_map[row_X] = {};
+        if (dict.construction_map.count(row_X) == 0) {
+            dict.construction_map[row_X] = {};
         }
-        construction_map[row_X].insert(row_Y);
+        dict.construction_map[row_X].insert(row_Y);
     }
-    return Dictionary<GlobalSchema...>{
-        construction_map,
-        attrs_X,
-        attrs_Y
-    };
+    return dict;
 }
 
 // print
 template<typename... GlobalSchema>
-void print(Table<GlobalSchema...> table) {
+void print(const Table<GlobalSchema...>& table) {
+    std::cout << table.attributes << std::endl;
     for (const HashableRow<GlobalSchema...>& row : table.data) {
         print(row);
+        std::cout << std::endl;
+    }
+}
+
+template<typename... GlobalSchema>
+void print(const Dictionary<GlobalSchema...>& dict) {
+    std::cout << dict.attributes_X << std::endl;
+    std::cout << dict.attributes_Y << std::endl;
+    for (const auto& [key, value] : dict.construction_map) {
+        print(key);
+        std::cout << " -> " << std::endl;
+        for (const HashableRow<GlobalSchema...>& row : value) {
+            std::cout << "    ";
+            print(row);
+            std::cout << std::endl;
+        }
         std::cout << std::endl;
     }
 }

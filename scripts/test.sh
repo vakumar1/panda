@@ -8,5 +8,4 @@ docker run \
   -w $WORKSPACE_DIR \
   gcr.io/bazel-public/bazel:latest \
   --output_user_root=$BUILD_DIR \
-  build :all --disk_cache=$BUILD_DIR
-
+  run //tst:panda_test --disk_cache=$BUILD_DIR

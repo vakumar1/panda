@@ -8,4 +8,14 @@ cc_binary(
     deps = [
         "@abseil-cpp//absl/strings",
     ],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "panda_lib",
+    srcs = [
+        "model/table.h",
+        "model/row.h",
+    ],
+    visibility = ["//visibility:public"],
 )

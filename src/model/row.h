@@ -18,7 +18,7 @@ struct HashableRow {
     std::array<std::any, N> data;
     std::size_t hash;
 
-    HashableRow(std::array<std::any, N>& data_) {
+    HashableRow(const std::array<std::any, N>& data_) {
         data = data_;
         hash = cache_hash(data_);
     }
@@ -52,7 +52,7 @@ struct HashableRow {
 
     // hash
     template<size_t index>
-    std::size_t hash_idx(std::array<std::any, N>& data_) {
+    std::size_t hash_idx(const std::array<std::any, N>& data_) const {
         if (data[index].has_value()) {
             return std::hash<elem_type<index, GlobalSchema...>>{}(std::any_cast<elem_type<index, GlobalSchema...>>(data_[index]));
         } else {
@@ -61,7 +61,7 @@ struct HashableRow {
     }
     
     template<std::size_t... Indices>
-    std::size_t hash_pack(std::array<std::any, N>& data_, std::index_sequence<Indices...>) {
+    std::size_t hash_pack(const std::array<std::any, N>& data_, std::index_sequence<Indices...>) const {
         std::array<std::size_t, N> seeds = {hash_idx<Indices>(data_)...};
         std::size_t seed = seeds.size();
         for (std::size_t i = 0; i < seeds.size(); i++) {
@@ -70,7 +70,7 @@ struct HashableRow {
         return seed;
     }
 
-    std::size_t cache_hash(std::array<std::any, N>& data_) {
+    std::size_t cache_hash(const std::array<std::any, N>& data_) const {
         return hash_pack(data_, std::make_index_sequence<N>{});
     }
 };
@@ -85,7 +85,7 @@ struct std::hash<HashableRow<GlobalSchema...>> {
 // row mask
 template<typename... GlobalSchema>
 std::any mask_row_idx(
-        attr_type<GlobalSchema...>& attributes,
+        const attr_type<GlobalSchema...>& attributes,
         const HashableRow<GlobalSchema...>& row,
         std::size_t index) {
     if (attributes[index]) {
@@ -97,7 +97,7 @@ std::any mask_row_idx(
 
 template<typename... GlobalSchema, std::size_t... Indices>
 HashableRow<GlobalSchema...> mask_row_pack(
-        attr_type<GlobalSchema...>& attributes,
+        const attr_type<GlobalSchema...>& attributes,
         const HashableRow<GlobalSchema...>& row,
         std::index_sequence<Indices...>) {
     std::array<std::any, sizeof...(GlobalSchema)> data = {mask_row_idx<GlobalSchema...>(attributes, row, Indices)...};
@@ -107,7 +107,7 @@ HashableRow<GlobalSchema...> mask_row_pack(
 
 template<typename... GlobalSchema>
 HashableRow<GlobalSchema...> mask_row(
-        attr_type<GlobalSchema...>& attributes,
+        const attr_type<GlobalSchema...>& attributes,
         const HashableRow<GlobalSchema...>& row) {
     return mask_row_pack(attributes, row, std::make_index_sequence<sizeof...(GlobalSchema)>{});
 }
@@ -117,8 +117,8 @@ template<typename... GlobalSchema>
 std::any join_rows_idx(
         const HashableRow<GlobalSchema...>& row_X, 
         const HashableRow<GlobalSchema...>& row_Y, 
-        attr_type<GlobalSchema...>& attributes_X, 
-        attr_type<GlobalSchema...>& attributes_Y,
+        const attr_type<GlobalSchema...>& attributes_X, 
+        const attr_type<GlobalSchema...>& attributes_Y,
         std::size_t index) {
     if (attributes_X[index]) {
         return row_X.data[index];
@@ -133,8 +133,8 @@ template<typename... GlobalSchema, std::size_t... Indices>
 HashableRow<GlobalSchema...> join_rows_pack(
         const HashableRow<GlobalSchema...>& row_X, 
         const HashableRow<GlobalSchema...>& row_Y, 
-        attr_type<GlobalSchema...>& attributes_X, 
-        attr_type<GlobalSchema...>& attributes_Y,
+        const attr_type<GlobalSchema...>& attributes_X, 
+        const attr_type<GlobalSchema...>& attributes_Y,
         std::index_sequence<Indices...>) {
     std::array<std::any, sizeof...(GlobalSchema)> data = 
         {join_rows_idx<GlobalSchema...>(row_X, row_Y, attributes_X, attributes_Y, Indices)...};
@@ -146,8 +146,8 @@ template<typename... GlobalSchema>
 HashableRow<GlobalSchema...> join_rows(
         const HashableRow<GlobalSchema...>& row_X, 
         const HashableRow<GlobalSchema...>& row_Y, 
-        attr_type<GlobalSchema...>& attributes_X, 
-        attr_type<GlobalSchema...>& attributes_Y) {
+        const attr_type<GlobalSchema...>& attributes_X, 
+        const attr_type<GlobalSchema...>& attributes_Y) {
     return join_rows_pack(row_X, row_Y, attributes_X, attributes_Y, std::make_index_sequence<sizeof...(GlobalSchema)>{});
 }
 
