@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <bitset>
 #include <any>
+#include <cmath>
 
 #include "src/model/table.h"
 
@@ -103,6 +104,63 @@ void verify_join_result(
             << "X projection not found in dictionary";
         EXPECT_TRUE(dict.construction_map.at(x_proj).count(y_proj) > 0) 
             << "Y projection not found in dictionary value set for X";
+    }
+}
+
+template<typename... GlobalSchema>
+void verify_partition_result(
+    const Table<GlobalSchema...>& table,
+    const std::vector<Table<GlobalSchema...>>& partitions,
+    const attr_type<GlobalSchema...>& partition_attrs) {
+    std::unordered_map<HashableRow<GlobalSchema...>, std::size_t> degrees;
+    for (const auto& row : table.data) {
+        HashableRow<GlobalSchema...> row_X = mask_row<GlobalSchema...>(partition_attrs, row);
+        if (degrees.count(row_X) == 0) {
+            degrees[row_X] = 0;
+        }
+        degrees[row_X]++;
+    }
+
+    // verify all rows in the same partition have the same log degree
+    for (const auto& part : partitions) {
+        std::unordered_set<unsigned> log_degrees = {};
+        for (const auto& row : part.data) {
+            HashableRow<GlobalSchema...> row_X = mask_row<GlobalSchema...>(partition_attrs, row);
+            unsigned log_degree = std::ceil(log2(degrees[row_X]));
+            log_degrees.insert(log_degree);
+        }
+        EXPECT_EQ(log_degrees.size(), 1);
+    }
+
+    // verify all rows with the same row_X projection are contained in most 2 partitions
+    std::unordered_map<HashableRow<GlobalSchema...>, std::size_t> partition_counts;
+    for (const auto& part : partitions) {
+        std::unordered_set<HashableRow<GlobalSchema...>> rows;
+        for (const auto& row : part.data) {
+            HashableRow<GlobalSchema...> row_X = mask_row<GlobalSchema...>(partition_attrs, row);
+            rows.insert(row_X);
+        }
+        for (const auto& row : rows) {
+            if (partition_counts.count(row) == 0) {
+                partition_counts[row] = 0;
+            }
+            partition_counts[row]++;
+        }
+    }
+    for (const auto& [row_X, count] : partition_counts) {
+        EXPECT_LE(count, 2);
+    }
+
+    // verify each row is in exactly one partition
+    // this then also verifies that each partition has less rows than the original table
+    for (const auto& row : table.data) {
+        std::size_t count = 0;
+        for (const auto& part : partitions) {
+            if (part.data.count(row) > 0) {
+                count++;
+            }
+        }
+        EXPECT_EQ(count, 1);
     }
 }
 
@@ -280,4 +338,51 @@ TEST(TableTest, EmptyTableTest) {
     EXPECT_EQ(empty_proj.data.size(), 0);
     Dictionary<int, double, double> empty_dict = construction(empty_table, std::bitset<3>("011"), std::bitset<3>("100"));
     EXPECT_EQ(empty_dict.construction_map.size(), 0);
+}
+
+TEST(TableTest, BasicPartitionTest) {
+    std::unordered_set<HashableRow<int, double, double>> data;
+    for (std::size_t i = 0; i < 3; i++) {
+        std::array<std::any, 3> row = {
+            std::any((int) i % 2),
+            std::any((double) 2.0 * i),
+            std::any((double) 3.0 * i)
+        };
+        HashableRow<int, double, double> row_obj = create_row<int, double, double>(row);
+        data.insert(row_obj);
+    }
+    Table<int, double, double> table{data, std::bitset<3>("111")};
+    auto partitions = partition(table, std::bitset<3>("001"));
+    verify_partition_result(table, partitions, std::bitset<3>("001"));
+    
+}
+
+TEST(TableTest, MultiColumnPartitionTest) {
+    std::unordered_set<HashableRow<int, double, double>> data;
+    for (std::size_t i = 0; i < 3; i++) {
+        for (std::size_t j = 0; j < 3; j++) {
+            if (i == 0 && (j == 0 || j == 1)) {
+                for (std::size_t k = 0; k < 25; k++) {
+                    std::array<std::any, 3> row = {
+                        std::any((int) i),
+                        std::any((double) j),
+                        std::any((double) 10.0 * i + j + k)
+                    };
+                    HashableRow<int, double, double> row_obj = create_row<int, double, double>(row);
+                    data.insert(row_obj);
+                }
+            } else {
+                std::array<std::any, 3> row = {
+                    std::any((int) i),
+                    std::any((double) j),
+                    std::any((double) 10.0 * i + j)
+                };
+                HashableRow<int, double, double> row_obj = create_row<int, double, double>(row);
+                data.insert(row_obj);
+            }
+        }
+    }
+    Table<int, double, double> table{data, std::bitset<3>("111")};
+    auto partitions = partition(table, std::bitset<3>("011"));
+    verify_partition_result(table, partitions, std::bitset<3>("011"));
 } 

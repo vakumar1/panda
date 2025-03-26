@@ -7,6 +7,7 @@
 #include <any>
 #include <utility>
 #include <bitset>
+#include <cmath>
 
 #include "src/model/row.h"
 
@@ -115,6 +116,52 @@ Dictionary<GlobalSchema...> construction(
         dict.construction_map[row_X].insert(row_Y);
     }
     return dict;
+}
+
+// partition
+template<typename... GlobalSchema>
+std::vector<Table<GlobalSchema...>> partition(
+        const Table<GlobalSchema...>& table,
+        const attr_type<GlobalSchema...>& partition_attrs) {
+    std::unordered_map<HashableRow<GlobalSchema...>, std::unordered_set<HashableRow<GlobalSchema...>>> row_X_to_rows;
+    for (const HashableRow<GlobalSchema...>& row : table.data) {
+        HashableRow<GlobalSchema...> row_X = mask_row<GlobalSchema...>(partition_attrs, row);
+        if (row_X_to_rows.count(row_X) == 0) {
+            row_X_to_rows[row_X] = {};
+        }
+        row_X_to_rows[row_X].insert(row);
+    }
+    unsigned bucket_count = 2 * std::ceil(log2(table.data.size())) + 1;
+    std::vector<std::vector<HashableRow<GlobalSchema...>>> partitioned_rows(bucket_count);
+    for (const auto& [row_X, rows] : row_X_to_rows) {
+        unsigned log_degree = std::ceil(log2(rows.size()));
+        for (const HashableRow<GlobalSchema...>& row : rows) {
+            partitioned_rows[log_degree].push_back(row);
+        }
+    }
+    std::vector<Table<GlobalSchema...>> partitioned_tables;
+    for (std::size_t i = 0; i < bucket_count; i++) {
+        Table<GlobalSchema...> partitioned_table1;
+        Table<GlobalSchema...> partitioned_table2;
+        partitioned_table1.attributes = table.attributes;
+        partitioned_table2.attributes = table.attributes;
+        partitioned_table1.data = {};
+        partitioned_table2.data = {};
+        for (std::size_t j = 0; j < partitioned_rows[i].size(); j++) {
+            if (j % 2 == 0) {
+                partitioned_table1.data.insert(partitioned_rows[i][j]);
+            } else {
+                partitioned_table2.data.insert(partitioned_rows[i][j]);
+            }
+        }
+        if (partitioned_table1.data.size() > 0) {
+            partitioned_tables.push_back(partitioned_table1);
+        }
+        if (partitioned_table2.data.size() > 0) {
+            partitioned_tables.push_back(partitioned_table2);
+        }
+    }
+    return partitioned_tables;
 }
 
 // print
