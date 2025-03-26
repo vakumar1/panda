@@ -6,9 +6,9 @@
 
 #include "src/model/table.h"
 
-template<typename... Types>
-HashableRow<Types...> create_row(const std::array<std::any, sizeof...(Types)>& values) {
-    return HashableRow<Types...>(values);
+template<typename... GlobalSchema>
+HashableRow<GlobalSchema...> create_row(const std::array<std::any, sizeof...(GlobalSchema)>& values) {
+    return HashableRow<GlobalSchema...>(values);
 }
 
 template<typename... GlobalSchema>
@@ -107,166 +107,166 @@ void verify_join_result(
 }
 
 TEST(TableTest, ProjectFirstTwoColumnsTest) {
-    std::unordered_set<HashableRow<int, double, int>> data;
+    std::unordered_set<HashableRow<int, double, double>> data;
     for (std::size_t i = 0; i < 3; i++) {
         std::array<std::any, 3> row = {
-            std::any(i),
-            std::any(2.0 * i),
-            std::any(3 * i)
+            std::any((int) i),
+            std::any((double) 2.0 * i),
+            std::any((double) 3.0 * i)
         };
-        data.insert(create_row<int, double, int>(row));
+        data.insert(create_row<int, double, double>(row));
     }
     
-    Table<int, double, int> table{data, std::bitset<3>("111")};
-    Table<int, double, int> proj = project(table, std::bitset<3>("011"));
+    Table<int, double, double> table{data, std::bitset<3>("111")};
+    Table<int, double, double> proj = project(table, std::bitset<3>("011"));
     verify_projection(proj, table, std::bitset<3>("011"));
 }
 
 TEST(TableTest, ProjectSingleColumnTest) {
-    std::unordered_set<HashableRow<int, double, int>> data;
+    std::unordered_set<HashableRow<int, double, double>> data;
     for (std::size_t i = 0; i < 3; i++) {
         std::array<std::any, 3> row = {
-            std::any(i),
-            std::any(2.0 * i),
-            std::any(3 * i)
+            std::any((int) i),
+            std::any((double) 2.0 * i),
+            std::any((double) 3.0 * i)
         };
-        data.insert(create_row<int, double, int>(row));
+        data.insert(create_row<int, double, double>(row));
     }
     
-    Table<int, double, int> table{data, std::bitset<3>("111")};
-    Table<int, double, int> proj = project(table, std::bitset<3>("100"));
+    Table<int, double, double> table{data, std::bitset<3>("111")};
+    Table<int, double, double> proj = project(table, std::bitset<3>("100"));
     verify_projection(proj, table, std::bitset<3>("100"));
 }
 
 TEST(TableTest, BasicConstructionTest) {
-    std::unordered_set<HashableRow<int, double, int>> data;
+    std::unordered_set<HashableRow<int, double, double>> data;
     for (std::size_t i = 0; i < 3; i++) {
         std::array<std::any, 3> row = {
-            std::any(i),
-            std::any(2.0 * i),
-            std::any(3 * i)
+            std::any((int) i),
+            std::any((double) 2.0 * i),
+            std::any((double) 3.0 * i)
         };
-        data.insert(create_row<int, double, int>(row));
+        data.insert(create_row<int, double, double>(row));
     }
     
-    Table<int, double, int> table{data, std::bitset<3>("111")};
+    Table<int, double, double> table{data, std::bitset<3>("111")};
     auto attrs_X = std::bitset<3>("011");
     auto attrs_Y = std::bitset<3>("100");
-    Dictionary<int, double, int> dict = construction(table, attrs_X, attrs_Y);
+    Dictionary<int, double, double> dict = construction(table, attrs_X, attrs_Y);
     verify_dictionary_construction(table, dict, attrs_X, attrs_Y);
 }
 
 TEST(TableTest, OverlappingConstructionTest) {
-    std::unordered_set<HashableRow<int, double, int>> data;
+    std::unordered_set<HashableRow<int, double, double>> data;
     std::array<std::any, 3> row1 = {
-        std::any(5),
-        std::any(2.5),
-        std::any(10)
+        std::any((int) 5),
+        std::any((double) 2.5),
+        std::any((double) 10.0)
     };
     std::array<std::any, 3> row2 = {
-        std::any(5),
-        std::any(2.5),
-        std::any(20)
+        std::any((int) 5),
+        std::any((double) 2.5),
+        std::any((double) 20.0)
     };
-    data.insert(create_row<int, double, int>(row1));
-    data.insert(create_row<int, double, int>(row2));
+    data.insert(create_row<int, double, double>(row1));
+    data.insert(create_row<int, double, double>(row2));
     
-    Table<int, double, int> table{data, std::bitset<3>("111")};
+    Table<int, double, double> table{data, std::bitset<3>("111")};
     auto attrs_X = std::bitset<3>("011");
     auto attrs_Y = std::bitset<3>("100");
-    Dictionary<int, double, int> dict = construction(table, attrs_X, attrs_Y);
+    Dictionary<int, double, double> dict = construction(table, attrs_X, attrs_Y);
     verify_dictionary_construction(table, dict, attrs_X, attrs_Y);
 }
 
 TEST(TableTest, BasicJoinTest) {
-    std::unordered_set<HashableRow<int, double, int>> data1;
+    std::unordered_set<HashableRow<int, double, double>> data1;
     for (std::size_t i = 0; i < 3; i++) {
         std::array<std::any, 3> row = {
-            std::any(i),
-            std::any(2.0 * i),
+            std::any((int) i),
+            std::any((double) 2.0 * i),
             std::any()
         };
-        data1.insert(create_row<int, double, int>(row));
+        data1.insert(create_row<int, double, double>(row));
     }
-    Table<int, double, int> table1{data1, std::bitset<3>("011")};
+    Table<int, double, double> table1{data1, std::bitset<3>("011")};
     
-    std::unordered_map<HashableRow<int, double, int>, std::unordered_set<HashableRow<int, double, int>>> map;
+    std::unordered_map<HashableRow<int, double, double>, std::unordered_set<HashableRow<int, double, double>>> map;
     for (std::size_t i = 0; i < 3; i++) {
         std::array<std::any, 3> key = {
-            std::any(i),
-            std::any(2.0 * i),
+            std::any((int) i),
+            std::any((double) 2.0 * i),
             std::any()
         };
-        auto key_row = create_row<int, double, int>(key);
-        map[key_row] = std::unordered_set<HashableRow<int, double, int>>();
+        auto key_row = create_row<int, double, double>(key);
+        map[key_row] = std::unordered_set<HashableRow<int, double, double>>();
 
         std::array<std::any, 3> value = {
             std::any(),
             std::any(),
-            std::any(3 * i)
+            std::any((double) 3.0 * i)
         };
-        auto value_row = create_row<int, double, int>(value);
+        auto value_row = create_row<int, double, double>(value);
         map[key_row].insert(value_row);
     }
-    Dictionary<int, double, int> dict{map, std::bitset<3>("011"), std::bitset<3>("100")};
-    Table<int, double, int> joined = join(table1, dict);
+    Dictionary<int, double, double> dict{map, std::bitset<3>("011"), std::bitset<3>("100")};
+    Table<int, double, double> joined = join(table1, dict);
     verify_join_result(joined, table1, dict);
 }
 
 TEST(TableTest, MultipleYJoinTest) {
-    std::unordered_set<HashableRow<int, double, int>> data1;
+    std::unordered_set<HashableRow<int, double, double>> data1;
     for (std::size_t i = 0; i < 2; i++) {
         std::array<std::any, 3> row = {
-            std::any(i),
-            std::any(2.0 * i),
+            std::any((int) i),
+            std::any((double) 2.0 * i),
             std::any()
         };
-        data1.insert(create_row<int, double, int>(row));
+        data1.insert(create_row<int, double, double>(row));
     }
-    Table<int, double, int> table1{data1, std::bitset<3>("011")};
+    Table<int, double, double> table1{data1, std::bitset<3>("011")};
     
-    std::unordered_map<HashableRow<int, double, int>, std::unordered_set<HashableRow<int, double, int>>> map;
+    std::unordered_map<HashableRow<int, double, double>, std::unordered_set<HashableRow<int, double, double>>> map;
     for (std::size_t i = 0; i < 2; i++) {
         std::array<std::any, 3> key = {
-            std::any(i),
-            std::any(2.0 * i),
+            std::any((int) i),
+            std::any((double) 2.0 * i),
             std::any()
         };
-        auto key_row = create_row<int, double, int>(key);
-        map[key_row] = std::unordered_set<HashableRow<int, double, int>>();
+        auto key_row = create_row<int, double, double>(key);
+        map[key_row] = std::unordered_set<HashableRow<int, double, double>>();
         
         for (std::size_t j = 0; j < 3; j++) {
             std::array<std::any, 3> value = {
                 std::any(),
                 std::any(),
-                std::any(10 * i + j)
+                std::any((double) 10.0 * i + j)
             };
-            auto value_row = create_row<int, double, int>(value);
+            auto value_row = create_row<int, double, double>(value);
             map[key_row].insert(value_row);
         }
     }
-    Dictionary<int, double, int> dict{map, std::bitset<3>("011"), std::bitset<3>("100")};
-    Table<int, double, int> joined = join(table1, dict);
+    Dictionary<int, double, double> dict{map, std::bitset<3>("011"), std::bitset<3>("100")};
+    Table<int, double, double> joined = join(table1, dict);
     verify_join_result(joined, table1, dict);
 }
 
 TEST(TableTest, ExtensionTest) {
-    std::unordered_map<HashableRow<int, double, int>, std::unordered_set<HashableRow<int, double, int>>> map;
+    std::unordered_map<HashableRow<int, double, double>, std::unordered_set<HashableRow<int, double, double>>> map;
     for (std::size_t i = 0; i < 3; i++) {
         std::array<std::any, 3> key = {
-            std::any(i),
+            std::any((int) i),
             std::any(),
             std::any()
         };
         std::array<std::any, 3> value = {
             std::any(),
-            std::any(2.0 * i),
+            std::any((double) 2.0 * i),
             std::any()
         };
-        map[create_row<int, double, int>(key)].insert(create_row<int, double, int>(value));
+        map[create_row<int, double, double>(key)].insert(create_row<int, double, double>(value));
     }
-    Dictionary<int, double, int> dict{map, std::bitset<3>("100"), std::bitset<3>("010")};
-    ExtendedDictionary<int, double, int> ext = extension(dict, std::bitset<3>("100"));
+    Dictionary<int, double, double> dict{map, std::bitset<3>("100"), std::bitset<3>("010")};
+    ExtendedDictionary<int, double, double> ext = extension(dict, std::bitset<3>("100"));
     EXPECT_EQ(ext.attributes_X, std::bitset<3>("100"));
     EXPECT_EQ(ext.attributes_Y, std::bitset<3>("010"));
     EXPECT_EQ(ext.attributes_Z, std::bitset<3>("100"));
@@ -274,10 +274,10 @@ TEST(TableTest, ExtensionTest) {
 }
 
 TEST(TableTest, EmptyTableTest) {
-    std::unordered_set<HashableRow<int, double, int>> empty_data;
-    Table<int, double, int> empty_table{empty_data, std::bitset<3>("111")};
-    Table<int, double, int> empty_proj = project(empty_table, std::bitset<3>("011"));
+    std::unordered_set<HashableRow<int, double, double>> empty_data;
+    Table<int, double, double> empty_table{empty_data, std::bitset<3>("111")};
+    Table<int, double, double> empty_proj = project(empty_table, std::bitset<3>("011"));
     EXPECT_EQ(empty_proj.data.size(), 0);
-    Dictionary<int, double, int> empty_dict = construction(empty_table, std::bitset<3>("011"), std::bitset<3>("100"));
+    Dictionary<int, double, double> empty_dict = construction(empty_table, std::bitset<3>("011"), std::bitset<3>("100"));
     EXPECT_EQ(empty_dict.construction_map.size(), 0);
 } 

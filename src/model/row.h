@@ -11,6 +11,19 @@ using attr_type = typename std::bitset<sizeof...(GlobalSchema)>;
 template<std::size_t index, typename... GlobalSchema>
 using elem_type = typename std::tuple_element_t<index, std::tuple<GlobalSchema...>>;
 
+template<std::size_t index, typename... GlobalSchema>
+elem_type<index, GlobalSchema...> safe_get(const std::array<std::any, sizeof...(GlobalSchema)>& data_) {
+    try {
+        return std::any_cast<elem_type<index, GlobalSchema...>>(data_[index]);
+    } catch (const std::bad_any_cast& e) {
+        std::string error_msg = "Bad any cast: ";
+        error_msg += "index=" + std::to_string(index) + " ";
+        error_msg += "expected_type=" + std::string(typeid(elem_type<index, GlobalSchema...>).name()) + " ";
+        error_msg += "actual_type=" + std::string(data_[index].type().name());
+        throw std::runtime_error(error_msg);
+    }
+}
+
 template<typename... GlobalSchema>
 struct HashableRow {
     static constexpr std::size_t N = sizeof...(GlobalSchema);
@@ -32,8 +45,7 @@ struct HashableRow {
             return false;
         }
         if (this_has_value && other_has_value) {
-            if (std::any_cast<elem_type<index, GlobalSchema...>>(data[index]) 
-                    != std::any_cast<elem_type<index, GlobalSchema...>>(other.data[index])) {
+            if (safe_get<index, GlobalSchema...>(data) != safe_get<index, GlobalSchema...>(other.data)) {
                 return false;
             }
         }
@@ -54,7 +66,7 @@ struct HashableRow {
     template<size_t index>
     std::size_t hash_idx(const std::array<std::any, N>& data_) const {
         if (data[index].has_value()) {
-            return std::hash<elem_type<index, GlobalSchema...>>{}(std::any_cast<elem_type<index, GlobalSchema...>>(data_[index]));
+            return std::hash<elem_type<index, GlobalSchema...>>{}(safe_get<index, GlobalSchema...>(data_));
         } else {
             return 0;
         }
@@ -155,7 +167,7 @@ template<std::size_t index, typename... GlobalSchema>
 std::string print_idx(const HashableRow<GlobalSchema...>& row) {
     std::stringstream ss;
     if (row.data[index].has_value()) {
-        ss << std::any_cast<elem_type<index, GlobalSchema...>>(row.data[index]);
+        ss << safe_get<index, GlobalSchema...>(row.data);
     } else {
         ss << "null";
     }
