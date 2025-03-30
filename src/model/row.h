@@ -1,3 +1,5 @@
+#pragma once
+
 #include <array>
 #include <any>
 #include <algorithm>
@@ -7,6 +9,9 @@
 
 template<typename... GlobalSchema>
 using attr_type = typename std::bitset<sizeof...(GlobalSchema)>;
+
+template<typename... GlobalSchema>
+static attr_type<GlobalSchema...> NULL_ATTR = attr_type<GlobalSchema...>();
 
 template<std::size_t index, typename... GlobalSchema>
 using elem_type = typename std::tuple_element_t<index, std::tuple<GlobalSchema...>>;

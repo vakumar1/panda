@@ -1,3 +1,5 @@
+#pragma once
+
 #include <variant>
 #include <tuple>
 #include <vector>
@@ -8,6 +10,7 @@
 #include <utility>
 #include <bitset>
 #include <cmath>
+#include <iostream>
 
 #include "src/model/row.h"
 
@@ -242,6 +245,39 @@ std::vector<Table<GlobalSchema...>> partition(
     }
     return partitioned_tables;
 }
+
+// dict degree
+template<typename... GlobalSchema>
+unsigned degree(const BaseDictionary<GlobalSchema...> dict) {
+    unsigned degree = 0;
+    for (const auto& [_, rows_Y] : dict.construction_map) {
+        degree = std::max(degree, rows_Y.size());
+    }
+    return degree;
+}
+
+template<typename... GlobalSchema>
+unsigned degree(const ExtendedDictionary<GlobalSchema...> dict) {
+    unsigned degree = 0;
+    for (const auto& [_, rows_Y] : dict.construction_map) {
+        degree = std::max(degree, rows_Y.size());
+    }
+    return degree;
+}
+
+template<typename... GlobalSchema>
+unsigned degree(const Dictionary<GlobalSchema...>& dict) {
+    const auto visitor = overloads<BaseDictionary<GlobalSchema...>, ExtendedDictionary<GlobalSchema...>>{
+        [](const BaseDictionary<GlobalSchema...>& dict) {
+            degree(dict);
+        },
+        [](const ExtendedDictionary<GlobalSchema...>& dict) {
+            degree(dict);
+        }
+    };
+    return std::visit(visitor, dict);
+}
+
 
 // print
 template<typename... GlobalSchema>
