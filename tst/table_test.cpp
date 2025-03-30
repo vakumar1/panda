@@ -46,7 +46,7 @@ void verify_projection(
 template<typename... GlobalSchema>
 void verify_dictionary_construction(
     const Table<GlobalSchema...>& original_table,
-    const Dictionary<GlobalSchema...>& dict,
+    const BaseDictionary<GlobalSchema...>& dict,
     const attr_type<GlobalSchema...>& attrs_X,
     const attr_type<GlobalSchema...>& attrs_Y) {
     
@@ -79,16 +79,17 @@ template<typename... GlobalSchema>
 void verify_join_result(
     const Table<GlobalSchema...>& joined,
     const Table<GlobalSchema...>& original_table,
-    const Dictionary<GlobalSchema...>& dict) {
+    const BaseDictionary<GlobalSchema...>& dict) {
     
     EXPECT_EQ(joined.attributes, dict.attributes_X ^ dict.attributes_Y) 
         << "Joined table should have joined dict attrs (combining table attributes with dictionary Y attributes)";
     
     // Calculate expected number of rows by summing up Y values for each matching X
     size_t expected_size = 0;
-    for (const auto& original_row : original_table.data) {        
-        if (dict.construction_map.count(original_row.data) > 0) {
-            expected_size += dict.construction_map.at(original_row.data).size();
+    for (const auto& original_row : original_table.data) {
+        auto x_proj = create_projection<GlobalSchema...>(original_row.data, dict.attributes_X);
+        if (dict.construction_map.count(x_proj) > 0) {
+            expected_size += dict.construction_map.at(x_proj).size();
         }
     }
     EXPECT_EQ(joined.data.size(), expected_size) 
@@ -98,8 +99,20 @@ void verify_join_result(
     for (const auto& joined_row : joined.data) {
         auto x_proj = create_projection<GlobalSchema...>(joined_row.data, dict.attributes_X);
         auto y_proj = create_projection<GlobalSchema...>(joined_row.data, dict.attributes_Y);
-        EXPECT_TRUE(original_table.data.count(x_proj) > 0) 
+        
+        // Verify X projection exists in original table
+        bool found_in_original = false;
+        for (const auto& original_row : original_table.data) {
+            auto original_x_proj = create_projection<GlobalSchema...>(original_row.data, dict.attributes_X);
+            if (x_proj == original_x_proj) {
+                found_in_original = true;
+                break;
+            }
+        }
+        EXPECT_TRUE(found_in_original) 
             << "X projection from joined row not found in original table";
+        
+        // Verify X projection exists in dictionary and Y projection is in its value set
         EXPECT_TRUE(dict.construction_map.count(x_proj) > 0) 
             << "X projection not found in dictionary";
         EXPECT_TRUE(dict.construction_map.at(x_proj).count(y_proj) > 0) 
@@ -210,7 +223,7 @@ TEST(TableTest, BasicConstructionTest) {
     Table<int, double, double> table{data, std::bitset<3>("111")};
     auto attrs_X = std::bitset<3>("011");
     auto attrs_Y = std::bitset<3>("100");
-    Dictionary<int, double, double> dict = construction(table, attrs_X, attrs_Y);
+    BaseDictionary<int, double, double> dict = std::get<BaseDictionary<int, double, double>>(construction(table, attrs_X, attrs_Y));
     verify_dictionary_construction(table, dict, attrs_X, attrs_Y);
 }
 
@@ -232,7 +245,7 @@ TEST(TableTest, OverlappingConstructionTest) {
     Table<int, double, double> table{data, std::bitset<3>("111")};
     auto attrs_X = std::bitset<3>("011");
     auto attrs_Y = std::bitset<3>("100");
-    Dictionary<int, double, double> dict = construction(table, attrs_X, attrs_Y);
+    BaseDictionary<int, double, double> dict = std::get<BaseDictionary<int, double, double>>(construction(table, attrs_X, attrs_Y));
     verify_dictionary_construction(table, dict, attrs_X, attrs_Y);
 }
 
@@ -266,7 +279,7 @@ TEST(TableTest, BasicJoinTest) {
         auto value_row = create_row<int, double, double>(value);
         map[key_row].insert(value_row);
     }
-    Dictionary<int, double, double> dict{map, std::bitset<3>("011"), std::bitset<3>("100")};
+    BaseDictionary<int, double, double> dict{map, std::bitset<3>("011"), std::bitset<3>("100")};
     Table<int, double, double> joined = join(table1, dict);
     verify_join_result(joined, table1, dict);
 }
@@ -303,7 +316,7 @@ TEST(TableTest, MultipleYJoinTest) {
             map[key_row].insert(value_row);
         }
     }
-    Dictionary<int, double, double> dict{map, std::bitset<3>("011"), std::bitset<3>("100")};
+    BaseDictionary<int, double, double> dict{map, std::bitset<3>("011"), std::bitset<3>("100")};
     Table<int, double, double> joined = join(table1, dict);
     verify_join_result(joined, table1, dict);
 }
@@ -323,7 +336,7 @@ TEST(TableTest, ExtensionTest) {
         };
         map[create_row<int, double, double>(key)].insert(create_row<int, double, double>(value));
     }
-    Dictionary<int, double, double> dict{map, std::bitset<3>("100"), std::bitset<3>("010")};
+    BaseDictionary<int, double, double> dict{map, std::bitset<3>("100"), std::bitset<3>("010")};
     ExtendedDictionary<int, double, double> ext = extension(dict, std::bitset<3>("100"));
     EXPECT_EQ(ext.attributes_X, std::bitset<3>("100"));
     EXPECT_EQ(ext.attributes_Y, std::bitset<3>("010"));
@@ -336,7 +349,7 @@ TEST(TableTest, EmptyTableTest) {
     Table<int, double, double> empty_table{empty_data, std::bitset<3>("111")};
     Table<int, double, double> empty_proj = project(empty_table, std::bitset<3>("011"));
     EXPECT_EQ(empty_proj.data.size(), 0);
-    Dictionary<int, double, double> empty_dict = construction(empty_table, std::bitset<3>("011"), std::bitset<3>("100"));
+    BaseDictionary<int, double, double> empty_dict = std::get<BaseDictionary<int, double, double>>(construction(empty_table, std::bitset<3>("011"), std::bitset<3>("100")));
     EXPECT_EQ(empty_dict.construction_map.size(), 0);
 }
 
@@ -354,7 +367,6 @@ TEST(TableTest, BasicPartitionTest) {
     Table<int, double, double> table{data, std::bitset<3>("111")};
     auto partitions = partition(table, std::bitset<3>("001"));
     verify_partition_result(table, partitions, std::bitset<3>("001"));
-    
 }
 
 TEST(TableTest, MultiColumnPartitionTest) {

@@ -28,6 +28,7 @@ template<typename... GlobalSchema>
 struct HashableRow {
     static constexpr std::size_t N = sizeof...(GlobalSchema);
 
+    // TODO: make data reference
     std::array<std::any, N> data;
     std::size_t hash;
 
@@ -163,6 +164,7 @@ HashableRow<GlobalSchema...> join_rows(
     return join_rows_pack(row_X, row_Y, attributes_X, attributes_Y, std::make_index_sequence<sizeof...(GlobalSchema)>{});
 }
 
+// print
 template<std::size_t index, typename... GlobalSchema>
 std::string print_idx(const HashableRow<GlobalSchema...>& row) {
     std::stringstream ss;

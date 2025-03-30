@@ -19,7 +19,8 @@ struct Table {
 };
 
 template<typename... GlobalSchema>
-struct Dictionary {
+struct BaseDictionary {
+    // X -> Y
     std::unordered_map<HashableRow<GlobalSchema...>, std::unordered_set<HashableRow<GlobalSchema...>>> construction_map;
     attr_type<GlobalSchema...> attributes_X;
     attr_type<GlobalSchema...> attributes_Y;
@@ -27,11 +28,18 @@ struct Dictionary {
 
 template<typename... GlobalSchema>
 struct ExtendedDictionary {
+    // XZ -> Y
     std::unordered_map<HashableRow<GlobalSchema...>, std::unordered_set<HashableRow<GlobalSchema...>>> construction_map;
     attr_type<GlobalSchema...> attributes_X;
     attr_type<GlobalSchema...> attributes_Y;
     attr_type<GlobalSchema...> attributes_Z;
 };
+
+template<class... Ts>
+struct overloads : Ts... { using Ts::operator()...; };
+
+template<typename... GlobalSchema>
+using Dictionary = std::variant<BaseDictionary<GlobalSchema...>, ExtendedDictionary<GlobalSchema...>>;
 
 // projection
 template<typename... GlobalSchema>
@@ -52,11 +60,11 @@ Table<GlobalSchema...> project(
 template<typename... GlobalSchema>
 Table<GlobalSchema...> join(
         const Table<GlobalSchema...>& table,
-        const Dictionary<GlobalSchema...>& dictionary) {
+        const BaseDictionary<GlobalSchema...>& dictionary) {
 
     // TODO: add runtime precondition that overlap_attrs == 0
     const attr_type<GlobalSchema...> join_attrs = dictionary.attributes_X ^ dictionary.attributes_Y;
-    const attr_type<GlobalSchema...> overlap_attrs = dictionary.attributes_X | dictionary.attributes_Y;
+    const attr_type<GlobalSchema...> overlap_attrs = dictionary.attributes_X & dictionary.attributes_Y;
 
     Table<GlobalSchema...> join_table;
     join_table.attributes = join_attrs;
@@ -73,10 +81,50 @@ Table<GlobalSchema...> join(
     return join_table;
 }
 
+template<typename... GlobalSchema>
+Table<GlobalSchema...> join(
+        const Table<GlobalSchema...>& table,
+        const ExtendedDictionary<GlobalSchema...>& dictionary) {
+
+    // TODO: add runtime precondition that overlap_attrs == 0
+    const attr_type<GlobalSchema...> join_attrs = (dictionary.attributes_X ^ dictionary.attributes_Z) ^ dictionary.attributes_Y;
+    const attr_type<GlobalSchema...> overlap_attrs = (dictionary.attributes_X & dictionary.attributes_Z) & dictionary.attributes_Y;
+
+    Table<GlobalSchema...> join_table;
+    join_table.attributes = join_attrs;
+    join_table.data = {};
+    for (const HashableRow<GlobalSchema...>& row_XZ : table.data) {
+        HashableRow<GlobalSchema...> row_X = mask_row<GlobalSchema...>(dictionary.attributes_X, row_XZ);
+        if (dictionary.construction_map.count(row_X) > 0) {
+            for (const HashableRow<GlobalSchema...>& row_Y : dictionary.construction_map.at(row_X)) {
+                HashableRow<GlobalSchema...> join_row = 
+                    join_rows<GlobalSchema...>(row_XZ, row_Y, dictionary.attributes_X, dictionary.attributes_Y);
+                join_table.data.insert(join_row);
+            }
+        }
+    }
+    return join_table;
+}
+
+template<typename... GlobalSchema>
+Table<GlobalSchema...> join(
+        const Table<GlobalSchema...>& table,
+        const Dictionary<GlobalSchema...>& dictionary) {
+    const auto visitor = overloads<BaseDictionary<GlobalSchema...>, ExtendedDictionary<GlobalSchema...>>{
+        [table](const BaseDictionary<GlobalSchema...>& dict) {
+            return join(table, dict);
+        },
+        [table](const ExtendedDictionary<GlobalSchema...>& dict) {
+            return join(table, dict);
+        }
+    };
+    return std::visit(visitor, dictionary);
+}
+
 // extension
 template<typename... GlobalSchema>
 ExtendedDictionary<GlobalSchema...> extension(
-        const Dictionary<GlobalSchema...>& dictionary,
+        const BaseDictionary<GlobalSchema...>& dictionary,
         const attr_type<GlobalSchema...>& ext_attrs) {
 
     // TODO: add runtime precondition that overlap_attrs == 0
@@ -88,6 +136,37 @@ ExtendedDictionary<GlobalSchema...> extension(
         dictionary.attributes_Y,
         ext_attrs
     };
+}
+
+template<typename... GlobalSchema>
+ExtendedDictionary<GlobalSchema...> extension(
+        const ExtendedDictionary<GlobalSchema...>& dictionary,
+        const attr_type<GlobalSchema...>& ext_attrs) {
+
+    // TODO: add runtime precondition that overlap_attrs == 0
+    const attr_type<GlobalSchema...> overlap_attrs = ext_attrs & ((dictionary.attributes_X & dictionary.attributes_Z) & dictionary.attributes_Y);
+
+    return ExtendedDictionary<GlobalSchema...>{
+        dictionary.construction_map,
+        dictionary.attributes_X,
+        dictionary.attributes_Y,
+        ext_attrs ^ dictionary.attributes_Z
+    };
+}
+
+template<typename... GlobalSchema>
+Dictionary<GlobalSchema...> extension(
+        const Dictionary<GlobalSchema...>& dictionary,
+        const attr_type<GlobalSchema...>& ext_attrs) {
+    const auto visitor = overloads<BaseDictionary<GlobalSchema...>, ExtendedDictionary<GlobalSchema...>>{
+        [ext_attrs](const BaseDictionary<GlobalSchema...>& dict) {
+            return extension(dict, ext_attrs);
+        },
+        [ext_attrs](const ExtendedDictionary<GlobalSchema...>& dict) {
+            return extension(dict, ext_attrs);
+        }
+    };
+    return std::visit(visitor, dictionary);
 }
 
 // construction
@@ -103,7 +182,7 @@ Dictionary<GlobalSchema...> construction(
     // TODO: add runtime precondition that join_attrs = table attrs
     const attr_type<GlobalSchema...> join_attrs = attrs_X ^ attrs_Y;
 
-    Dictionary<GlobalSchema...> dict;
+    BaseDictionary<GlobalSchema...> dict;
     dict.attributes_X = attrs_X;
     dict.attributes_Y = attrs_Y;
     dict.construction_map = {};
@@ -175,7 +254,7 @@ void print(const Table<GlobalSchema...>& table) {
 }
 
 template<typename... GlobalSchema>
-void print(const Dictionary<GlobalSchema...>& dict) {
+void print(const BaseDictionary<GlobalSchema...>& dict) {
     std::cout << dict.attributes_X << std::endl;
     std::cout << dict.attributes_Y << std::endl;
     for (const auto& [key, value] : dict.construction_map) {
@@ -188,4 +267,34 @@ void print(const Dictionary<GlobalSchema...>& dict) {
         }
         std::cout << std::endl;
     }
+}
+
+template<typename... GlobalSchema>
+void print(const ExtendedDictionary<GlobalSchema...>& dict) {
+    std::cout << dict.attributes_X << std::endl;
+    std::cout << dict.attributes_Y << std::endl;
+    std::cout << dict.attributes_Z << std::endl;
+    for (const auto& [key, value] : dict.construction_map) {
+        print(key);
+        std::cout << " -> " << std::endl;
+        for (const HashableRow<GlobalSchema...>& row : value) {
+            std::cout << "    ";
+            print(row);
+            std::cout << std::endl;
+        }
+        std::cout << std::endl;
+    }
+}
+
+template<typename... GlobalSchema>
+void print(const Dictionary<GlobalSchema...>& dict) {
+    const auto visitor = overloads<BaseDictionary<GlobalSchema...>, ExtendedDictionary<GlobalSchema...>>{
+        [](const BaseDictionary<GlobalSchema...>& dict) {
+            print(dict);
+        },
+        [](const ExtendedDictionary<GlobalSchema...>& dict) {
+            print(dict);
+        }
+    };
+    std::visit(visitor, dict);
 }
