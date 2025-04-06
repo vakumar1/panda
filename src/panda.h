@@ -6,77 +6,66 @@
 #include <functional>
 #include <memory>
 
+#include "src/panda_cases.h"
+#include "src/panda_utils.h"
+#include "src/model/panda.h"
 #include "src/model/table.h"
 #include "src/model/row.h"
 
 template<typename... GlobalSchema>
-using OutputAttributes = attr_type<GlobalSchema...>;
+std::vector<Subproblem<GlobalSchema...>> generate_subproblem_subnodes(const Subproblem<GlobalSchema...>& subproblem);
+
+// function definitions
 
 template<typename... GlobalSchema>
-struct Monotonicity {
-    attr_type<GlobalSchema...> attrs_Y;
-    attr_type<GlobalSchema...> attrs_X;
-};
+std::vector<Subproblem<GlobalSchema...>> generate_subproblem_leaves(const Subproblem<GlobalSchema...> subproblem) {
+    std::vector<Subproblem<GlobalSchema...>> curr_problems;
+    curr_problems.push_back(subproblem);
+    std::vector<Subproblem<GlobalSchema...>> leaves;
+    while (!curr_problems.empty()) {
+        Subproblem<GlobalSchema...>& curr_problem = curr_problems.back();
+        curr_problems.pop_back();
+        if (is_leaf(curr_problem)) {
+            leaves.push_back(curr_problem);
+        } else {
+            curr_problems.push_back(generate_subproblem_subnodes(curr_problem));
+        }
+    }
+    return leaves;
+}
 
 template<typename... GlobalSchema>
-struct Submodularity {
-    attr_type<GlobalSchema...> attrs_Y;
-    attr_type<GlobalSchema...> attrs_Z;
-    attr_type<GlobalSchema...> attrs_X;
-};
-
-template<typename... GlobalSchema>
-struct Subproblem {
-    Subproblem(
-        const std::unordered_map<OutputAttributes<GlobalSchema...>, unsigned> Z_,
-        const std::unordered_map<Monotonicity<GlobalSchema...>, unsigned> D_,
-        const std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Table<GlobalSchema...>, unsigned>>> Tn_tables_,
-        const std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Dictionary<GlobalSchema...>, unsigned>>> Tn_dicts_,
-        const std::unordered_map<Monotonicity<GlobalSchema...>, unsigned> M_,
-        const std::unordered_map<Submodularity<GlobalSchema...>, unsigned> S_,
-        const long double global_bound_
-    ) : Z(Z_), D(D_), Tn_tables(Tn_tables_), Tn_dicts(Tn_dicts_), M(M_), S(S_), global_bound(global_bound_) {
-        verify_state();
+std::vector<Subproblem<GlobalSchema...>> generate_subproblem_subnodes(const Subproblem<GlobalSchema...>& subproblem) {
+    std::vector<Subproblem<GlobalSchema...>> subnodes;
+    Monotonicity<GlobalSchema...> unconditional_monotonicity;
+    bool found_unconditional_monotonicity = false;
+    for (const auto& [monotonicity, count] : subproblem.D) {
+        if (is_unconditional_monotonicity(monotonicity)) {
+            unconditional_monotonicity = monotonicity;
+            found_unconditional_monotonicity = true;
+            break;
+        }
+    }
+    if (!found_unconditional_monotonicity) {
+        throw std::runtime_error("No unconditional monotonicity found");
     }
 
-    const std::unordered_map<OutputAttributes<GlobalSchema...>, unsigned> Z;
-    const std::unordered_map<Monotonicity<GlobalSchema...>, unsigned> D;
-    const std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Table<GlobalSchema...>, unsigned>>> Tn_tables;
-    const std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Dictionary<GlobalSchema...>, unsigned>>> Tn_dicts;
-    const std::unordered_map<Monotonicity<GlobalSchema...>, unsigned> M;
-    const std::unordered_map<Submodularity<GlobalSchema...>, unsigned> S;
-    const long double global_bound;
-    
-    void verify_state() const {
-        // TODO:
-        // - verify each table condition is null set
-        // - verify count in D matches each T count
-        // - (optional) verify Shannon equality
+    std::optional<Monotonicity<GlobalSchema...>> condition_monotonicity = find_condition_monotonicity(subproblem, unconditional_monotonicity);
+    if (condition_monotonicity) {
+        subnodes.push_back(generate_condition_subproblem(subproblem, unconditional_monotonicity, *condition_monotonicity));
+        return subnodes;
     }
-};
 
-template<typename... GlobalSchema>
-struct std::hash<Monotonicity<GlobalSchema...>> {
-    std::size_t operator()(const Monotonicity<GlobalSchema...>& m) const {
-        std::size_t seed = 0;
-        std::hash<attr_type<GlobalSchema...>> hasher;
-        seed ^= hasher(m.attrs_Y) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        seed ^= hasher(m.attrs_X) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        return seed;
+    std::optional<Monotonicity<GlobalSchema...>> split_monotonicity = find_split_monotonicity(subproblem, unconditional_monotonicity);
+    if (split_monotonicity) {
+        subnodes.push_back(generate_split_subproblem(subproblem, unconditional_monotonicity, *split_monotonicity));
+        return subnodes;
     }
-};
 
-template<typename... GlobalSchema>
-struct std::hash<Submodularity<GlobalSchema...>> {
-    std::size_t operator()(const Submodularity<GlobalSchema...>& s) const {
-        std::size_t seed = 0;
-        std::hash<attr_type<GlobalSchema...>> hasher;
-        seed ^= hasher(s.attrs_Y) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        seed ^= hasher(s.attrs_Z) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        seed ^= hasher(s.attrs_X) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        return seed;
+    std::optional<Submodularity<GlobalSchema...>> partition_submodularity = find_partition_submodularity(subproblem, unconditional_monotonicity);
+    if (partition_submodularity) {
+        return generate_partition_subproblems(subproblem, unconditional_monotonicity, *partition_submodularity);
     }
-};
 
-template<typename... GlobalSchema>
-std::vector<Subproblem<GlobalSchema...>> generate_subproblem_leaves(const Subproblem<GlobalSchema...> subproblem);
+    throw std::runtime_error("No case matched subproblem");
+}
