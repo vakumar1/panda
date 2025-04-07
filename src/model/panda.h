@@ -1,7 +1,12 @@
 #pragma once
 
+#include <fmt/core.h>
+
+#include "src/utils.h"
 #include "src/model/table.h"
 #include "src/model/row.h"
+
+using Constraint = long double;
 
 template<typename... GlobalSchema>
 using OutputAttributes = attr_type<GlobalSchema...>;
@@ -14,6 +19,10 @@ struct Monotonicity {
     bool operator==(const Monotonicity& other) const {
         return attrs_Y == other.attrs_Y && attrs_X == other.attrs_X;
     }
+
+    std::string to_string() const {
+        return fmt::format("{} | {}", attrs_Y.to_string(), attrs_X.to_string());
+    }
 };
 
 template<typename... GlobalSchema>
@@ -25,6 +34,10 @@ struct Submodularity {
     bool operator==(const Submodularity& other) const {
         return attrs_Y == other.attrs_Y && attrs_Z == other.attrs_Z && attrs_X == other.attrs_X;
     }
+
+    std::string to_string() const {
+        return fmt::format("{} ; {} | {}", attrs_Y.to_string(), attrs_Z.to_string(), attrs_X.to_string());
+    }
 };
 
 template<typename... GlobalSchema>
@@ -32,8 +45,8 @@ struct Subproblem {
     Subproblem(
         const std::unordered_map<OutputAttributes<GlobalSchema...>, unsigned> Z_,
         const std::unordered_map<Monotonicity<GlobalSchema...>, unsigned> D_,
-        const std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Table<GlobalSchema...>, unsigned>>> Tn_tables_,
-        const std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Dictionary<GlobalSchema...>, unsigned>>> Tn_dicts_,
+        const std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Table<GlobalSchema...>, Constraint>>> Tn_tables_,
+        const std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Dictionary<GlobalSchema...>, Constraint>>> Tn_dicts_,
         const std::unordered_map<Monotonicity<GlobalSchema...>, unsigned> M_,
         const std::unordered_map<Submodularity<GlobalSchema...>, unsigned> S_,
         const long double global_bound_
@@ -43,8 +56,8 @@ struct Subproblem {
 
     const std::unordered_map<OutputAttributes<GlobalSchema...>, unsigned> Z;
     const std::unordered_map<Monotonicity<GlobalSchema...>, unsigned> D;
-    const std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Table<GlobalSchema...>, unsigned>>> Tn_tables;
-    const std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Dictionary<GlobalSchema...>, unsigned>>> Tn_dicts;
+    const std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Table<GlobalSchema...>, Constraint>>> Tn_tables;
+    const std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Dictionary<GlobalSchema...>, Constraint>>> Tn_dicts;
     const std::unordered_map<Monotonicity<GlobalSchema...>, unsigned> M;
     const std::unordered_map<Submodularity<GlobalSchema...>, unsigned> S;
     const long double global_bound;
@@ -79,3 +92,39 @@ struct std::hash<Submodularity<GlobalSchema...>> {
         return seed;
     }
 };
+
+template<typename... GlobalSchema>
+void print(const Subproblem<GlobalSchema...> subproblem) {
+    std::cout << "Subproblem: -----" << std::endl;
+    
+    std::cout << TAB << "Z" << std::endl;
+    for (const auto& [output_attrs, count] : subproblem.Z) {
+        std::cout << TAB << TAB << output_attrs.to_string() << TAB << count << std::endl;
+    }
+    
+    std::cout << TAB << "D" << std::endl;
+    for (const auto& [mon, count] : subproblem.D) {
+        std::cout << TAB << TAB << mon.to_string() << TAB << count << std::endl;
+    }
+
+    std::cout << TAB << "Tn_tables" << std::endl;
+    for (const auto&[mon, tables] : subproblem.Tn_tables) {
+        std::cout << TAB << TAB << mon.to_string() << TAB << tables.size() << std::endl;
+    }
+
+    std::cout << TAB << "Tn_dicts" << std::endl;
+    for (const auto&[mon, dicts] : subproblem.Tn_dicts) {
+        std::cout << TAB << TAB << mon.to_string() << TAB << dicts.size() << std::endl;
+    }
+
+    std::cout << TAB << "M" << std::endl;
+    for (const auto& [mon, count] : subproblem.M) {
+        std::cout << TAB << TAB << mon.to_string() << TAB << count << std::endl;
+    }
+
+    std::cout << TAB << "S" << std::endl;
+    for (const auto& [sub, count] : subproblem.S) {
+        std::cout << TAB << TAB << sub.to_string() << TAB << count << std::endl;
+    }
+    std::cout << "-----" << std::endl;
+}

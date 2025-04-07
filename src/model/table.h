@@ -38,9 +38,6 @@ struct ExtendedDictionary {
     attr_type<GlobalSchema...> attributes_Z;
 };
 
-template<class... Ts>
-struct overloads : Ts... { using Ts::operator()...; };
-
 template<typename... GlobalSchema>
 using Dictionary = std::variant<BaseDictionary<GlobalSchema...>, ExtendedDictionary<GlobalSchema...>>;
 
@@ -113,14 +110,7 @@ template<typename... GlobalSchema>
 Table<GlobalSchema...> join(
         const Table<GlobalSchema...>& table,
         const Dictionary<GlobalSchema...>& dictionary) {
-    const auto visitor = overloads<BaseDictionary<GlobalSchema...>, ExtendedDictionary<GlobalSchema...>>{
-        [table](const BaseDictionary<GlobalSchema...>& dict) {
-            return join(table, dict);
-        },
-        [table](const ExtendedDictionary<GlobalSchema...>& dict) {
-            return join(table, dict);
-        }
-    };
+    const auto visitor = [table](const auto& dict){ return join(table, dict); };
     return std::visit(visitor, dictionary);
 }
 
@@ -161,14 +151,7 @@ template<typename... GlobalSchema>
 Dictionary<GlobalSchema...> extension(
         const Dictionary<GlobalSchema...>& dictionary,
         const attr_type<GlobalSchema...>& ext_attrs) {
-    const auto visitor = overloads<BaseDictionary<GlobalSchema...>, ExtendedDictionary<GlobalSchema...>>{
-        [ext_attrs](const BaseDictionary<GlobalSchema...>& dict) {
-            return extension(dict, ext_attrs);
-        },
-        [ext_attrs](const ExtendedDictionary<GlobalSchema...>& dict) {
-            return extension(dict, ext_attrs);
-        }
-    };
+    const auto visitor = [ext_attrs](const auto& dict){ return extension(dict, ext_attrs); };
     return std::visit(visitor, dictionary);
 }
 
@@ -248,8 +231,8 @@ std::vector<Table<GlobalSchema...>> partition(
 
 // dict degree
 template<typename... GlobalSchema>
-unsigned degree(const BaseDictionary<GlobalSchema...> dict) {
-    unsigned degree = 0;
+std::size_t degree(const BaseDictionary<GlobalSchema...> dict) {
+    std::size_t degree = 0;
     for (const auto& [_, rows_Y] : dict.construction_map) {
         degree = std::max(degree, rows_Y.size());
     }
@@ -257,8 +240,8 @@ unsigned degree(const BaseDictionary<GlobalSchema...> dict) {
 }
 
 template<typename... GlobalSchema>
-unsigned degree(const ExtendedDictionary<GlobalSchema...> dict) {
-    unsigned degree = 0;
+std::size_t degree(const ExtendedDictionary<GlobalSchema...> dict) {
+    std::size_t degree = 0;
     for (const auto& [_, rows_Y] : dict.construction_map) {
         degree = std::max(degree, rows_Y.size());
     }
@@ -266,15 +249,8 @@ unsigned degree(const ExtendedDictionary<GlobalSchema...> dict) {
 }
 
 template<typename... GlobalSchema>
-unsigned degree(const Dictionary<GlobalSchema...>& dict) {
-    const auto visitor = overloads<BaseDictionary<GlobalSchema...>, ExtendedDictionary<GlobalSchema...>>{
-        [](const BaseDictionary<GlobalSchema...>& dict) {
-            degree(dict);
-        },
-        [](const ExtendedDictionary<GlobalSchema...>& dict) {
-            degree(dict);
-        }
-    };
+std::size_t degree(const Dictionary<GlobalSchema...>& dict) {
+    const auto visitor = [](const auto& dict){ return degree(dict); };
     return std::visit(visitor, dict);
 }
 
@@ -324,13 +300,6 @@ void print(const ExtendedDictionary<GlobalSchema...>& dict) {
 
 template<typename... GlobalSchema>
 void print(const Dictionary<GlobalSchema...>& dict) {
-    const auto visitor = overloads<BaseDictionary<GlobalSchema...>, ExtendedDictionary<GlobalSchema...>>{
-        [](const BaseDictionary<GlobalSchema...>& dict) {
-            print(dict);
-        },
-        [](const ExtendedDictionary<GlobalSchema...>& dict) {
-            print(dict);
-        }
-    };
+    const auto visitor = [](const auto& dict){ print(dict); };
     std::visit(visitor, dict);
 }

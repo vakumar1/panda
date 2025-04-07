@@ -20,7 +20,7 @@ bool is_leaf(const Subproblem<GlobalSchema...>& original_subproblem, const Subpr
 
 template<typename... GlobalSchema>
 bool is_unconditional_monotonicity(const Monotonicity<GlobalSchema...>& monotonicity) {
-    return monotonicity.attrs_X.empty();
+    return monotonicity.attrs_X.none();
 }
 
 
@@ -46,11 +46,11 @@ Subproblem<GlobalSchema...> apply_reset_lemma(const Subproblem<GlobalSchema...>&
     decrement_count(D_, monotonicity);
 
     // Case 0: W in Z (base case)
-    for (const auto& [output_monotonicity, count] : subproblem.Z) {
-        if (monotonicity.attrs_Y == output_monotonicity.attrs_Y && monotonicity.attrs_X == output_monotonicity.attrs_X) {
+    for (const auto& [output_attrs, count] : subproblem.Z) {
+        if (monotonicity.attrs_Y == output_attrs && monotonicity.attrs_X == NULL_ATTR<GlobalSchema...>) {
             // remove Z
-            std::unordered_map<Monotonicity<GlobalSchema...>, unsigned> Z_ = subproblem.Z;
-            decrement_count(Z_, monotonicity);
+            std::unordered_map<OutputAttributes<GlobalSchema...>, unsigned> Z_ = subproblem.Z;
+            decrement_count(Z_, output_attrs);
             return Subproblem(
                 Z_,
                 D_,
@@ -75,9 +75,9 @@ Subproblem<GlobalSchema...> apply_reset_lemma(const Subproblem<GlobalSchema...>&
             increment_count(D_, mon_YW);
 
             // remove Y|W from dicts
-            std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Dictionary<GlobalSchema...>, unsigned>>> Tn_dicts_ = subproblem.Tn_dicts;
-            std::pair<Dictionary<GlobalSchema...>, unsigned> Tn_dict_Y_W = Tn_dicts_[condition_monotonicity].front();
-            Tn_dicts_[condition_monotonicity].pop_front();
+            std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Dictionary<GlobalSchema...>, Constraint>>> Tn_dicts_ = subproblem.Tn_dicts;
+            std::pair<Dictionary<GlobalSchema...>, Constraint> Tn_dict_Y_W = Tn_dicts_[condition_monotonicity].back();
+            Tn_dicts_[condition_monotonicity].pop_back();
 
             // retry reset to remove YW|0
             Subproblem<GlobalSchema...> retry_subproblem = Subproblem(
@@ -94,7 +94,7 @@ Subproblem<GlobalSchema...> apply_reset_lemma(const Subproblem<GlobalSchema...>&
 
     // Case 2: W = XY and Y|X in M (inductive case)
     for (const auto& [witness_monotonicity, count] : subproblem.M) {
-        if (monotonicity.attrs_Y == witness_monotonicity.attrs_X ^ witness_monotonicity.attrs_Y) {
+        if (monotonicity.attrs_Y == (witness_monotonicity.attrs_X ^ witness_monotonicity.attrs_Y)) {
 
             // remove Y|X from M
             std::unordered_map<Monotonicity<GlobalSchema...>, unsigned> M_ = subproblem.M;
@@ -123,10 +123,10 @@ Subproblem<GlobalSchema...> apply_reset_lemma(const Subproblem<GlobalSchema...>&
 
     // Case 3: W = XY and Y;Z|X in S (inductive case)
     for (const auto& [witness_submodularity, count] : subproblem.S) {
-        if (monotonicity.attrs_Y == witness_submodularity.attrs_X ^ witness_submodularity.attrs_Y) {
+        if (monotonicity.attrs_Y == (witness_submodularity.attrs_X ^ witness_submodularity.attrs_Y)) {
 
             // remove Y;Z|X from S
-            std::unordered_map<Monotonicity<GlobalSchema...>, unsigned> S_ = subproblem.S;
+            std::unordered_map<Submodularity<GlobalSchema...>, unsigned> S_ = subproblem.S;
             decrement_count(S_, witness_submodularity);
 
             // add XYZ to D and add Z|X to M

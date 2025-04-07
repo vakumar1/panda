@@ -7,6 +7,10 @@ cc_library(
         "panda.h",
         "panda_cases.h",
         "panda_utils.h",
+        "utils.h",
+    ],
+    deps = [
+        "@fmt//:fmt",
     ],
     visibility = ["//visibility:public"],
 )

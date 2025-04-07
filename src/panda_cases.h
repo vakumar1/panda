@@ -21,15 +21,15 @@ Subproblem<GlobalSchema...> generate_condition_subproblem(const Subproblem<Globa
     const Monotonicity<GlobalSchema...>& condition_monotonicity) {
 
     // remove W|0 from tables and remove Y|W from dicts 
-    std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Table<GlobalSchema...>, unsigned>>> Tn_tables_ = subproblem.Tn_tables;
-    std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Dictionary<GlobalSchema...>, unsigned>>> Tn_dicts_ = subproblem.Tn_dicts;
-    std::pair<Table<GlobalSchema...>, unsigned> Tn_table_W = Tn_tables_[monotonicity].front();
-    std::pair<Dictionary<GlobalSchema...>, unsigned> Tn_dict_Y_W = Tn_dicts_[condition_monotonicity].front();
-    Tn_tables_[monotonicity].pop_front();
-    Tn_dicts_[condition_monotonicity].pop_front();
-    unsigned N_W = Tn_table_W.second;
-    unsigned N_Y_W = Tn_dict_Y_W.second;
-    unsigned N_YW = N_W * N_Y_W;
+    std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Table<GlobalSchema...>, Constraint>>> Tn_tables_ = subproblem.Tn_tables;
+    std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Dictionary<GlobalSchema...>, Constraint>>> Tn_dicts_ = subproblem.Tn_dicts;
+    std::pair<Table<GlobalSchema...>, Constraint> Tn_table_W = Tn_tables_[monotonicity].back();
+    std::pair<Dictionary<GlobalSchema...>, Constraint> Tn_dict_Y_W = Tn_dicts_[condition_monotonicity].back();
+    Tn_tables_[monotonicity].pop_back();
+    Tn_dicts_[condition_monotonicity].pop_back();
+    Constraint N_W = Tn_table_W.second;
+    Constraint N_Y_W = Tn_dict_Y_W.second;
+    Constraint N_YW = N_W * N_Y_W;
 
     // remove W|0, Y|W from D and add YW|0 to D
     std::unordered_map<Monotonicity<GlobalSchema...>, unsigned> D_ = subproblem.D;
@@ -59,7 +59,16 @@ Subproblem<GlobalSchema...> generate_condition_subproblem(const Subproblem<Globa
     } else {
         // Case 1.2 - join not within bounds
         // apply reset lemma to remove YW|0
-        return apply_reset_lemma(mon_YW);
+        Subproblem<GlobalSchema...> inter_problem = Subproblem(
+            subproblem.Z,
+            D_,
+            Tn_tables_,
+            Tn_dicts_,
+            subproblem.M,
+            subproblem.S,
+            subproblem.global_bound
+        );
+        return apply_reset_lemma(inter_problem, mon_YW);
     }    
 }
 
@@ -68,7 +77,7 @@ template<typename... GlobalSchema>
 std::optional<Monotonicity<GlobalSchema...>> find_split_monotonicity(const Subproblem<GlobalSchema...>& subproblem,
     const Monotonicity<GlobalSchema...>& monotonicity) {
     for (const auto& [split_monotonicity, count] : subproblem.M) {
-        if (monotonicity.attrs_Y == split_monotonicity.attrs_Y ^ split_monotonicity.attrs_X) {
+        if (monotonicity.attrs_Y == (split_monotonicity.attrs_Y ^ split_monotonicity.attrs_X)) {
             return std::optional<Monotonicity<GlobalSchema...>>(split_monotonicity);
         }
     }
@@ -94,9 +103,9 @@ Subproblem<GlobalSchema...> generate_split_subproblem(const Subproblem<GlobalSch
     decrement_count<Monotonicity<GlobalSchema...>, GlobalSchema...>(D_, monotonicity);
 
     // remove XY and add X to tables
-    std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Table<GlobalSchema...>, unsigned>>> Tn_tables_ = subproblem.Tn_tables;
-    std::pair<Table<GlobalSchema...>, unsigned> Tn_table_XY = Tn_tables_[monotonicity].front();
-    Tn_tables_[monotonicity].pop_front();
+    std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Table<GlobalSchema...>, Constraint>>> Tn_tables_ = subproblem.Tn_tables;
+    std::pair<Table<GlobalSchema...>, Constraint> Tn_table_XY = Tn_tables_[monotonicity].back();
+    Tn_tables_[monotonicity].pop_back();
     Table<GlobalSchema...> Tn_table_X = project(Tn_table_XY.first, split_monotonicity.attrs_X);
     if (Tn_tables_.count(mon_X) == 0) {
         Tn_tables_[mon_X] = {};
@@ -119,7 +128,7 @@ template<typename... GlobalSchema>
 std::optional<Submodularity<GlobalSchema...>> find_partition_submodularity(const Subproblem<GlobalSchema...>& subproblem,
     const Monotonicity<GlobalSchema...>& monotonicity) {
     for (const auto& [partition_submodularity, count] : subproblem.S) {
-        if (monotonicity.attrs_Y == partition_submodularity.attrs_Y ^ partition_submodularity.attrs_X) {
+        if (monotonicity.attrs_Y == (partition_submodularity.attrs_Y ^ partition_submodularity.attrs_X)) {
             return std::optional<Submodularity<GlobalSchema...>>(partition_submodularity);
         }
     }
@@ -150,26 +159,26 @@ std::vector<Subproblem<GlobalSchema...>> generate_partition_subproblems(const Su
     decrement_count<Submodularity<GlobalSchema...>, GlobalSchema...>(S_, partition_submodularity);
 
     // remove XY and add partitions X_i, YXZ_i to tables
-    std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Table<GlobalSchema...>, unsigned>>> Tn_tables_ = subproblem.Tn_tables;
-    std::pair<Table<GlobalSchema...>, unsigned> Tn_table_XY = Tn_tables_[monotonicity].front();
-    Tn_tables_[monotonicity].pop_front();
-    std::vector<Table<GlobalSchema...>> Tn_table_XY_partitions = partition(Tn_table_XY, partition_submodularity.attrs_X);
+    std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Table<GlobalSchema...>, Constraint>>> Tn_tables_ = subproblem.Tn_tables;
+    std::pair<Table<GlobalSchema...>, Constraint> Tn_table_XY = Tn_tables_[monotonicity].back();
+    Tn_tables_[monotonicity].pop_back();
+    std::vector<Table<GlobalSchema...>> Tn_table_XY_partitions = partition(Tn_table_XY.first, partition_submodularity.attrs_X);
     std::vector<Subproblem<GlobalSchema...>> partition_subproblems = {};
     for (const auto& Tn_table_XY_i : Tn_table_XY_partitions) {
         // add X_i to tables (note XY is already removed here)
-        std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Table<GlobalSchema...>, unsigned>>> partition_Tn_tables_ = Tn_tables_;
+        std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Table<GlobalSchema...>, Constraint>>> partition_Tn_tables_ = Tn_tables_;
         Table<GlobalSchema...> Tn_table_X_i = project(Tn_table_XY_i, partition_submodularity.attrs_X);
-        unsigned N_X_i = Tn_table_X_i.data.size();
+        Constraint N_X_i = Tn_table_X_i.data.size();
         if (partition_Tn_tables_.count(mon_X) == 0) {
             partition_Tn_tables_[mon_X] = {};
         }
         partition_Tn_tables_[mon_X].push_back(std::make_pair(Tn_table_X_i, N_X_i));
 
         // add YXZ_i to dicts
-        std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Dictionary<GlobalSchema...>, unsigned>>> partition_Tn_dicts_ = subproblem.Tn_dicts;
+        std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Dictionary<GlobalSchema...>, Constraint>>> partition_Tn_dicts_ = subproblem.Tn_dicts;
         Dictionary<GlobalSchema...> Tn_dict_Y_X_i = construction(Tn_table_XY_i, partition_submodularity.attrs_X, partition_submodularity.attrs_Y);
         Dictionary<GlobalSchema...> Tn_dict_Y_XZ_i = extension(Tn_dict_Y_X_i, partition_submodularity.attrs_Z);
-        unsigned N_Y_XZ_i = degree(Tn_dict_Y_XZ_i);
+        Constraint N_Y_XZ_i = degree(Tn_dict_Y_XZ_i);
         if (partition_Tn_dicts_.count(mon_YXZ) == 0) {
             partition_Tn_dicts_[mon_YXZ] = {};
         }
