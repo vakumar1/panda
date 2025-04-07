@@ -116,6 +116,7 @@ void verify_subproblem_transformation(
     verify_diffs(S_diffs, expected_diff_S);
 }
 
+// Case 1.1: W|0, Y|W in D and N_W * N_Y_W <= B
 TEST(GenerateSubproblemSubnodesTest, Case1_1_ConditionMonotonicityWithinBounds) {
     attr_type<int, double, double> W = std::bitset<3>("001");
     attr_type<int, double, double> Y = std::bitset<3>("010");
@@ -191,4 +192,126 @@ TEST(GenerateSubproblemSubnodesTest, Case1_1_ConditionMonotonicityWithinBounds) 
         {},
         {}
     );
+}
+
+// Case 2: XY|0 in D and Y|X in M
+TEST(GenerateSubproblemSubnodesTest, Case2_SplitMonotonicity) {
+    attr_type<int, double, double> X = std::bitset<3>("001");
+    attr_type<int, double, double> Y = std::bitset<3>("010");
+    Monotonicity<int, double, double> mon_XY = {X ^ Y, NULL_ATTR<int, double, double>};
+    Monotonicity<int, double, double> mon_Y_X = {Y, X};
+
+    std::unordered_set<HashableRow<int, double, double>> data_XY;
+    for (std::size_t i = 0; i < 4; i++) {
+        std::array<std::any, 3> row = {
+            std::any((int) i),
+            std::any((double) i * 2.0),
+            std::any()
+        };
+        data_XY.insert(create_row<int, double, double>(row));
+    }
+    Table<int, double, double> table_XY{data_XY, X ^ Y};
+    
+    std::unordered_map<Monotonicity<int, double, double>, unsigned> D = {
+        {mon_XY, 1}
+    };
+    std::unordered_map<Monotonicity<int, double, double>, unsigned> M = {
+        {mon_Y_X, 1}
+    };
+    std::unordered_map<Monotonicity<int, double, double>, std::vector<std::pair<Table<int, double, double>, Constraint>>> Tn_tables = {
+        {mon_XY, {{table_XY, 4.0}}}
+    };
+    Subproblem<int, double, double> initial_subproblem(
+        {},
+        D,
+        Tn_tables,
+        {},
+        M,
+        {},
+        10.0
+    );
+    std::vector<Subproblem<int, double, double>> subnodes = generate_subproblem_subnodes(initial_subproblem);
+    
+    ASSERT_EQ(subnodes.size(), 1);
+    Monotonicity<int, double, double> mon_X = {X, NULL_ATTR<int, double, double>};
+    std::unordered_map<Monotonicity<int, double, double>, int> expected_diff_D = {
+        {mon_XY, -1},
+        {mon_X, 1}
+    };
+    std::unordered_map<Monotonicity<int, double, double>, int> expected_diff_M = {
+        {mon_Y_X, -1}
+    };
+    verify_subproblem_transformation(
+        initial_subproblem,
+        subnodes[0],
+        {},
+        expected_diff_D,
+        expected_diff_M,
+        {}
+    );
+}
+
+// Case 3: XY|0 in D and Y;Z|X in S
+TEST(GenerateSubproblemSubnodesTest, Case3_PartitionSubmodularity) {
+    attr_type<int, double, double> X = std::bitset<3>("001");
+    attr_type<int, double, double> Y = std::bitset<3>("010");
+    attr_type<int, double, double> Z = std::bitset<3>("100");
+    Monotonicity<int, double, double> mon_XY = {X ^ Y, NULL_ATTR<int, double, double>};
+    Submodularity<int, double, double> sub_YZ_X = {Y, Z, X};
+    
+    std::unordered_set<HashableRow<int, double, double>> data_XY;
+    for (std::size_t i = 0; i < 2; i++) {
+        for (std::size_t j = 0; j < 3; j++) {
+            std::array<std::any, 3> row = {
+                std::any((int) i),
+                std::any((double) j),
+                std::any()
+            };
+            data_XY.insert(create_row<int, double, double>(row));
+        }
+    }
+    Table<int, double, double> table_XY{data_XY, X ^ Y};
+    
+    std::unordered_map<Monotonicity<int, double, double>, unsigned> D = {
+        {mon_XY, 1}
+    };
+    std::unordered_map<Submodularity<int, double, double>, unsigned> S = {
+        {sub_YZ_X, 1}
+    };
+    std::unordered_map<Monotonicity<int, double, double>, std::vector<std::pair<Table<int, double, double>, Constraint>>> Tn_tables = {
+        {mon_XY, {{table_XY, 4.0}}}
+    };
+    Subproblem<int, double, double> initial_subproblem(
+        {},
+        D,
+        Tn_tables,
+        {},
+        {},
+        S,
+        10.0
+    );
+    std::vector<Subproblem<int, double, double>> subnodes = generate_subproblem_subnodes(initial_subproblem);
+    
+    ASSERT_EQ(subnodes.size(), 2);
+    
+    Monotonicity<int, double, double> mon_X = {X, NULL_ATTR<int, double, double>};
+    Monotonicity<int, double, double> mon_Y_XZ = {Y, X ^ Z};
+    std::unordered_map<Monotonicity<int, double, double>, int> expected_diff_D = {
+        {mon_XY, -1},
+        {mon_X, 1},
+        {mon_Y_XZ, 1}
+    };
+    std::unordered_map<Submodularity<int, double, double>, int> expected_diff_S = {
+        {sub_YZ_X, -1}
+    };
+    for (const auto& subnode : subnodes) {
+        verify_subproblem_transformation(
+            initial_subproblem,
+            subnode,
+            {},
+            expected_diff_D,
+            {},
+            expected_diff_S
+        );
+    }
 } 
