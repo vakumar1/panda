@@ -194,6 +194,171 @@ TEST(GenerateSubproblemSubnodesTest, Case1_1_ConditionMonotonicityWithinBounds) 
     );
 }
 
+// Case 1.1: W|0, Y|W in D and N_W * N_Y_W > B
+// - Reset Lemma Case 0: YW in Z
+TEST(GenerateSubproblemSubnodesTest, Case1_2_ConditionMonotonicityExceedsBounds_ResetCase1) {
+    // Test Case 1.2 where reset lemma encounters Case 1 (Y|W in D)
+    attr_type<int, double, double> W = std::bitset<3>("001");
+    attr_type<int, double, double> Y = std::bitset<3>("010");
+    Monotonicity<int, double, double> mon_W = {W, NULL_ATTR<int, double, double>};  // W|0
+    Monotonicity<int, double, double> mon_Y_W = {Y, W};  // Y|W
+    OutputAttributes<int, double, double> attrs_YW = Y ^ W;
+    
+    std::unordered_set<HashableRow<int, double, double>> data_W;
+    for (std::size_t i = 0; i < 4; i++) {
+        std::array<std::any, 3> row = {
+            std::any((int) i),
+            std::any(),
+            std::any()
+        };
+        data_W.insert(create_row<int, double, double>(row));
+    }
+    std::unordered_map<HashableRow<int, double, double>, std::unordered_set<HashableRow<int, double, double>>> map_Y_W;
+    for (const auto& w_row : data_W) {
+        map_Y_W[w_row] = std::unordered_set<HashableRow<int, double, double>>();
+        for (std::size_t i = 0; i < 3; i++) {
+            std::array<std::any, 3> value = {
+                std::any(),
+                std::any((double) i),
+                std::any()
+            };
+            map_Y_W[w_row].insert(create_row<int, double, double>(value));
+        }
+    }
+    Table<int, double, double> table_W{data_W, W};
+    BaseDictionary<int, double, double> base_dict_Y_W{map_Y_W, W, Y};
+    Dictionary<int, double, double> dict_Y_W = base_dict_Y_W;
+
+    std::unordered_map<OutputAttributes<int, double, double>, unsigned> Z = {
+        {attrs_YW, 1}
+    };
+    std::unordered_map<Monotonicity<int, double, double>, unsigned> D = {
+        {mon_W, 1},
+        {mon_Y_W, 1}
+    };
+    std::unordered_map<Monotonicity<int, double, double>, std::vector<std::pair<Table<int, double, double>, Constraint>>> Tn_tables = {
+        {mon_W, {{table_W, 4.0}}}
+    };
+    std::unordered_map<Monotonicity<int, double, double>, std::vector<std::pair<Dictionary<int, double, double>, Constraint>>> Tn_dicts = {
+        {mon_Y_W, {{dict_Y_W, 3.0}}}
+    };
+    
+    Subproblem<int, double, double> initial_subproblem(
+        Z,
+        D,
+        Tn_tables,
+        Tn_dicts,
+        {},
+        {},
+        10.0
+    );
+    std::vector<Subproblem<int, double, double>> subnodes = generate_subproblem_subnodes(initial_subproblem);
+    
+    ASSERT_EQ(subnodes.size(), 1);
+    std::unordered_map<OutputAttributes<int, double, double>, int> expected_diff_Z = {
+        {attrs_YW, -1}
+    };
+    std::unordered_map<Monotonicity<int, double, double>, int> expected_diff_D = {
+        {mon_W, -1},
+        {mon_Y_W, -1}
+    };
+    
+    verify_subproblem_transformation(
+        initial_subproblem,
+        subnodes[0],
+        expected_diff_Z,
+        expected_diff_D,
+        {},
+        {}
+    );
+}
+
+// Case 1.1: W|0, Y|W in D and N_W * N_Y_W > B
+// - Reset Lemma inductive case --> remove YW
+//   - Case 2: YW = AB and B|A in M --> remove A
+//   - Case 0: A in Z
+TEST(GenerateSubproblemSubnodesTest, Case1_2_ConditionMonotonicityExceedsBounds_ResetCase2) {
+    attr_type<int, double, double> A = std::bitset<3>("010");
+    attr_type<int, double, double> B = std::bitset<3>("101");
+    attr_type<int, double, double> W = std::bitset<3>("110");
+    attr_type<int, double, double> Y = std::bitset<3>("001");
+    Monotonicity<int, double, double> mon_W = {W, NULL_ATTR<int, double, double>};
+    Monotonicity<int, double, double> mon_Y_W = {Y, W};
+    Monotonicity<int, double, double> mon_B_A = {B, A};
+    
+    std::unordered_set<HashableRow<int, double, double>> data_W;
+    for (std::size_t i = 0; i < 4; i++) {
+        std::array<std::any, 3> row = {
+            std::any(),
+            std::any((double) i),
+            std::any((double) 2 * i)
+        };
+        data_W.insert(create_row<int, double, double>(row));
+    }
+    std::unordered_map<HashableRow<int, double, double>, std::unordered_set<HashableRow<int, double, double>>> map_Y_W;
+    for (const auto& w_row : data_W) {
+        map_Y_W[w_row] = std::unordered_set<HashableRow<int, double, double>>();
+        for (std::size_t i = 0; i < 3; i++) {
+            std::array<std::any, 3> value = {
+                std::any((int) i),
+                std::any(),
+                std::any()
+            };
+            map_Y_W[w_row].insert(create_row<int, double, double>(value));
+        }
+    }
+    Table<int, double, double> table_W{data_W, W};
+    BaseDictionary<int, double, double> base_dict_Y_W{map_Y_W, W, Y};
+    Dictionary<int, double, double> dict_Y_W = base_dict_Y_W;
+    
+    std::unordered_map<OutputAttributes<int, double, double>, unsigned> Z = {
+        {A, 1}
+    };
+    std::unordered_map<Monotonicity<int, double, double>, unsigned> D = {
+        {mon_W, 1},
+        {mon_Y_W, 1}
+    };
+    std::unordered_map<Monotonicity<int, double, double>, unsigned> M = {
+        {mon_B_A, 1}
+    };
+    std::unordered_map<Monotonicity<int, double, double>, std::vector<std::pair<Table<int, double, double>, Constraint>>> Tn_tables = {
+        {mon_W, {{table_W, 4.0}}}
+    };
+    std::unordered_map<Monotonicity<int, double, double>, std::vector<std::pair<Dictionary<int, double, double>, Constraint>>> Tn_dicts = {
+        {mon_Y_W, {{dict_Y_W, 3.0}}}
+    };
+    Subproblem<int, double, double> initial_subproblem(
+        Z,
+        D,
+        Tn_tables,
+        Tn_dicts,
+        M,
+        {},
+        10.0
+    );
+    std::vector<Subproblem<int, double, double>> subnodes = generate_subproblem_subnodes(initial_subproblem);
+    
+    ASSERT_EQ(subnodes.size(), 1);
+    std::unordered_map<OutputAttributes<int, double, double>, int> expected_diff_Z = {
+        {A, -1}
+    };
+    std::unordered_map<Monotonicity<int, double, double>, int> expected_diff_D = {
+        {mon_W, -1},
+        {mon_Y_W, -1}
+    };
+    std::unordered_map<Monotonicity<int, double, double>, int> expected_diff_M = {
+        {mon_B_A, -1}
+    };
+    verify_subproblem_transformation(
+        initial_subproblem,
+        subnodes[0],
+        expected_diff_Z,
+        expected_diff_D,
+        expected_diff_M,
+        {}
+    );
+}
+
 // Case 2: XY|0 in D and Y|X in M
 TEST(GenerateSubproblemSubnodesTest, Case2_SplitMonotonicity) {
     attr_type<int, double, double> X = std::bitset<3>("001");

@@ -51,7 +51,7 @@ Subproblem<GlobalSchema...> apply_reset_lemma(const Subproblem<GlobalSchema...>&
             // remove Z
             std::unordered_map<OutputAttributes<GlobalSchema...>, unsigned> Z_ = subproblem.Z;
             decrement_count(Z_, output_attrs);
-            return Subproblem(
+            Subproblem<GlobalSchema...> retry_subproblem = Subproblem(
                 Z_,
                 D_,
                 subproblem.Tn_tables,
@@ -59,6 +59,7 @@ Subproblem<GlobalSchema...> apply_reset_lemma(const Subproblem<GlobalSchema...>&
                 subproblem.M,
                 subproblem.S,
                 subproblem.global_bound);
+            return retry_subproblem;
         }
     }
     
@@ -101,7 +102,6 @@ Subproblem<GlobalSchema...> apply_reset_lemma(const Subproblem<GlobalSchema...>&
             decrement_count(M_, witness_monotonicity);
 
             // add X to D
-            std::unordered_map<Monotonicity<GlobalSchema...>, unsigned> D_ = subproblem.D;
             Monotonicity<GlobalSchema...> mon_X = Monotonicity<GlobalSchema...>{
                 witness_monotonicity.attrs_X,
                 NULL_ATTR<GlobalSchema...>,
@@ -130,7 +130,6 @@ Subproblem<GlobalSchema...> apply_reset_lemma(const Subproblem<GlobalSchema...>&
             decrement_count(S_, witness_submodularity);
 
             // add XYZ to D and add Z|X to M
-            std::unordered_map<Monotonicity<GlobalSchema...>, unsigned> D_ = subproblem.D;
             Monotonicity<GlobalSchema...> mon_XYZ = Monotonicity<GlobalSchema...>{
                 witness_submodularity.attrs_X ^ witness_submodularity.attrs_Y ^ witness_submodularity.attrs_Z,
                 NULL_ATTR<GlobalSchema...>,
@@ -156,4 +155,5 @@ Subproblem<GlobalSchema...> apply_reset_lemma(const Subproblem<GlobalSchema...>&
         }
     }
     
+    throw std::runtime_error("No case matched reset lemma subproblem");
 }
