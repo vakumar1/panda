@@ -43,24 +43,24 @@ struct Submodularity {
 template<typename... GlobalSchema>
 struct Subproblem {
     Subproblem(
-        const std::unordered_map<OutputAttributes<GlobalSchema...>, unsigned> Z_,
-        const std::unordered_map<Monotonicity<GlobalSchema...>, unsigned> D_,
-        const std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Table<GlobalSchema...>, Constraint>>> Tn_tables_,
-        const std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Dictionary<GlobalSchema...>, Constraint>>> Tn_dicts_,
-        const std::unordered_map<Monotonicity<GlobalSchema...>, unsigned> M_,
-        const std::unordered_map<Submodularity<GlobalSchema...>, unsigned> S_,
-        const long double global_bound_
+        std::unordered_map<OutputAttributes<GlobalSchema...>, unsigned> Z_,
+        std::unordered_map<Monotonicity<GlobalSchema...>, unsigned> D_,
+        std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Table<GlobalSchema...>, Constraint>>> Tn_tables_,
+        std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Dictionary<GlobalSchema...>, Constraint>>> Tn_dicts_,
+        std::unordered_map<Monotonicity<GlobalSchema...>, unsigned> M_,
+        std::unordered_map<Submodularity<GlobalSchema...>, unsigned> S_,
+        long double global_bound_
     ) : Z(Z_), D(D_), Tn_tables(Tn_tables_), Tn_dicts(Tn_dicts_), M(M_), S(S_), global_bound(global_bound_) {
         verify_state();
     }
 
-    const std::unordered_map<OutputAttributes<GlobalSchema...>, unsigned> Z;
-    const std::unordered_map<Monotonicity<GlobalSchema...>, unsigned> D;
-    const std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Table<GlobalSchema...>, Constraint>>> Tn_tables;
-    const std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Dictionary<GlobalSchema...>, Constraint>>> Tn_dicts;
-    const std::unordered_map<Monotonicity<GlobalSchema...>, unsigned> M;
-    const std::unordered_map<Submodularity<GlobalSchema...>, unsigned> S;
-    const long double global_bound;
+    std::unordered_map<OutputAttributes<GlobalSchema...>, unsigned> Z;
+    std::unordered_map<Monotonicity<GlobalSchema...>, unsigned> D;
+    std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Table<GlobalSchema...>, Constraint>>> Tn_tables;
+    std::unordered_map<Monotonicity<GlobalSchema...>, std::vector<std::pair<Dictionary<GlobalSchema...>, Constraint>>> Tn_dicts;
+    std::unordered_map<Monotonicity<GlobalSchema...>, unsigned> M;
+    std::unordered_map<Submodularity<GlobalSchema...>, unsigned> S;
+    long double global_bound;
     
     void verify_state() const {
         // TODO:

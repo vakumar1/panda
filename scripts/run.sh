@@ -8,4 +8,4 @@ docker run \
   -w $WORKSPACE_DIR \
   gcr.io/bazel-public/bazel:latest \
   --output_user_root=$BUILD_DIR \
-  run //src:panda --disk_cache=$BUILD_DIR
+  run //examples:example1 --disk_cache=$BUILD_DIR --compilation_mode=dbg

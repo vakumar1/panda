@@ -77,7 +77,9 @@ template<typename... GlobalSchema>
 std::optional<Monotonicity<GlobalSchema...>> find_split_monotonicity(const Subproblem<GlobalSchema...>& subproblem,
     const Monotonicity<GlobalSchema...>& monotonicity) {
     for (const auto& [split_monotonicity, count] : subproblem.M) {
-        if (monotonicity.attrs_Y == (split_monotonicity.attrs_Y ^ split_monotonicity.attrs_X)) {
+        if (monotonicity.attrs_Y == (split_monotonicity.attrs_Y ^ split_monotonicity.attrs_X)
+            && (split_monotonicity.attrs_Y != NULL_ATTR<GlobalSchema...>)
+            && (split_monotonicity.attrs_X != NULL_ATTR<GlobalSchema...>)) {
             return std::optional<Monotonicity<GlobalSchema...>>(split_monotonicity);
         }
     }
@@ -128,7 +130,9 @@ template<typename... GlobalSchema>
 std::optional<Submodularity<GlobalSchema...>> find_partition_submodularity(const Subproblem<GlobalSchema...>& subproblem,
     const Monotonicity<GlobalSchema...>& monotonicity) {
     for (const auto& [partition_submodularity, count] : subproblem.S) {
-        if (monotonicity.attrs_Y == (partition_submodularity.attrs_Y ^ partition_submodularity.attrs_X)) {
+        if (monotonicity.attrs_Y == (partition_submodularity.attrs_Y ^ partition_submodularity.attrs_X)
+            && (partition_submodularity.attrs_Y != NULL_ATTR<GlobalSchema...>)
+            && (partition_submodularity.attrs_X != NULL_ATTR<GlobalSchema...>)) {
             return std::optional<Submodularity<GlobalSchema...>>(partition_submodularity);
         }
     }

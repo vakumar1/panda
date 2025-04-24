@@ -5,17 +5,16 @@
 #include "src/model/row.h"
 
 template<typename... GlobalSchema>
-bool is_leaf(const Subproblem<GlobalSchema...>& original_subproblem, const Subproblem<GlobalSchema...>& subproblem) {
+std::optional<Monotonicity<GlobalSchema...>> is_leaf(const Subproblem<GlobalSchema...>& original_subproblem, const Subproblem<GlobalSchema...>& subproblem) {
     bool found_output_monotonicity = false;
     for (const auto& [monotonicity, count] : subproblem.D) {
         for (const auto& [output_attributes, count] : original_subproblem.Z) {
             if (monotonicity.attrs_Y == output_attributes && is_unconditional_monotonicity(monotonicity)) {
-                found_output_monotonicity = true;
-                break;
+                return std::optional(monotonicity);
             }
         }
     }
-    return found_output_monotonicity;
+    return std::nullopt;
 }
 
 template<typename... GlobalSchema>

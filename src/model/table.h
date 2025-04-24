@@ -98,7 +98,7 @@ Table<GlobalSchema...> join(
         if (dictionary.construction_map.count(row_X) > 0) {
             for (const HashableRow<GlobalSchema...>& row_Y : dictionary.construction_map.at(row_X)) {
                 HashableRow<GlobalSchema...> join_row = 
-                    join_rows<GlobalSchema...>(row_XZ, row_Y, dictionary.attributes_X, dictionary.attributes_Y);
+                    join_rows<GlobalSchema...>(row_XZ, row_Y, (dictionary.attributes_X ^ dictionary.attributes_Z), dictionary.attributes_Y);
                 join_table.data.insert(join_row);
             }
         }
@@ -228,6 +228,17 @@ std::vector<Table<GlobalSchema...>> partition(
     }
     return partitioned_tables;
 }
+
+// in-place union
+template<typename... GlobalSchema>
+void inplace_union(
+    Table<GlobalSchema...>& inplace_table,
+    Table<GlobalSchema...>& added_table) {
+    for (const auto& row : added_table.data) {
+        inplace_table.data.insert(row);
+    }
+}
+
 
 // dict degree
 template<typename... GlobalSchema>
