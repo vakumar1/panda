@@ -6,6 +6,7 @@ cc_binary(
     ],
     deps = [
         "//src:panda_lib",
+        "@yaml-cpp",
     ],
     visibility = ["//visibility:public"],
 )

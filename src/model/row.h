@@ -11,6 +11,9 @@ template<typename... GlobalSchema>
 using attr_type = typename std::bitset<sizeof...(GlobalSchema)>;
 
 template<typename... GlobalSchema>
+struct Dummy {};
+
+template<typename... GlobalSchema>
 static attr_type<GlobalSchema...> NULL_ATTR = attr_type<GlobalSchema...>();
 
 template<std::size_t index, typename... GlobalSchema>

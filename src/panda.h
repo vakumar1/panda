@@ -94,5 +94,5 @@ std::vector<Subproblem<GlobalSchema...>> generate_subproblem_subnodes(const Subp
         }
     }
 
-    throw std::runtime_error("No unconiditional monotonicity matched a case");
+    throw std::runtime_error("No unconditional monotonicity matched a case");
 }

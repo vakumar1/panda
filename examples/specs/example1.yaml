@@ -1,0 +1,17 @@
+---
+GlobalSchema: [A, B, C, D]
+
+Tables: 
+- [example1_t1.csv, 4, 0.5]
+- [example1_t2.csv, 5, 0.5]
+- [example1_t3.csv, 7, 0.5]
+
+OutputAttributes:
+- [A, B, C]
+- [B, C, D]
+
+M: []
+
+S:
+- [[A], [C], [B], 1]
+- [[B], [C, D], [], 1]
